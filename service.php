@@ -47,6 +47,7 @@ class Cupido extends Service {
                             OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}')
                            )";
 
+
         $common_filter .= " AND person.marital_status = 'SOLTERO' \n";
         $common_filter .= " AND person.cupido = 1\n";
         $common_filter .= " AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20";
