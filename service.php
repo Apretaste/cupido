@@ -13,9 +13,10 @@ class Cupido extends Service {
     public function _main(Request $request) {
 
         $user = $this->utils->getPerson($request->email);
+        $completion = $this->utils->getProfileCompletion($request->email);
 
-        // Verifying an empty profile
-        if ($user == false) {
+        // Verifying profile completion
+        if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name)) {
             $response = new Response();
             $response->setResponseSubject("Cree su perfil en Apretaste!");
             $response->createFromTemplate('not_profile.tpl', array('email' => $request->email, "editProfileText" => $this->createProfileEditableText($request->email)));
@@ -26,6 +27,29 @@ class Cupido extends Service {
         $this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
 
         // Match algorithm - building sql query
+
+        $common_filter = " person.email <> '{$request->email}'
+                      AND cupido = 1 
+                      AND NOT EXISTS (
+                                SELECT * FROM _cupido_ignores 
+                                WHERE _cupido_ignores.email2 = person.email
+                      ) ";
+
+        if ($user->sexual_orientation == 'HETERO')
+            $common_filter .= " AND person.gender <> '{$user->gender}' AND person.sexual_orientation <> 'HOMO'";
+
+        if ($user->sexual_orientation == 'HOMO')
+            $common_filter .= " AND person.gender = '{$user->gender}' AND person.sexual_orientation <> 'HETERO'";
+
+        if ($user->sexual_orientation == 'BI')
+            $common_filter .= " AND (person.sexual_orientation = 'BI' 
+                            OR (person.sexual_orientation = 'HOMO' AND person.gender = '{$user->gender}')
+                            OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}')
+                           )";
+
+        $common_filter .= " AND person.marital_status = 'SOLTERO' \n";
+        $common_filter .= " AND person.cupido = 1\n";
+        $common_filter .= " AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20";
 
         $sql = '';
 
@@ -54,7 +78,7 @@ class Cupido extends Service {
             `_province_distance`.`distance` AS `distance`,
             (select (100 - ((`_province_distance`.`distance` / (select max(`dist2`.`distance`) FROM `_province_distance` `dist2`)) * 100))) AS `proximity` 
             FROM `_province_distance`) as _province_proximity WHERE (province1 = person.province AND province2 = '{$user->province}') OR (province2 = person.province AND province1 = '{$user->province}')) / 100 * 15 as percent_proximity,\n";
-        $sql .= "(select count(*) FROM __cupido_likes WHERE __cupido_likes.email2 = person.email) / (select count(*) FROM person as __cupido_members WHERE __cupido_members.cupido = 1)  * 15 as percent_likes,\n";
+        $sql .= "(select count(*) FROM _cupido_likes WHERE _cupido_likes.email2 = person.email) / (select count(*) FROM person as __cupido_members WHERE __cupido_members.cupido = 1)  * 15 as percent_likes,\n";
         $sql .= "(select person.skin = '{$user->skin}') * 5 as same_skin,\n" . "(select person.picture is not null) * 20 as having_picture,\n";
         $sql .= "(1 - (abs(datediff(person.date_of_birth, '{$user->date_of_birth}'))/365 / 20)) * 15 as age_proximity,\n";
         $sql .= "(select person.body_type = '{$user->body_type}')* 5 as same_body_type,\n";
@@ -64,23 +88,7 @@ class Cupido extends Service {
         else
             $sql .= "0 as percent_preferences\n";
 
-        $sql .= " FROM person\n" . "WHERE person.email <> '{$request->email}' \n";
-
-        if ($user->sexual_orientation == 'HETERO')
-            $sql .= " AND person.gender <> '{$user->gender}' AND person.sexual_orientation <> 'HOMO'";
-
-        if ($user->sexual_orientation == 'HOMO')
-            $sql .= " AND person.gender = '{$user->gender}' AND person.sexual_orientation <> 'HETERO'";
-
-        if ($user->sexual_orientation == 'BI')
-            $sql .= " AND (person.sexual_orientation = 'BI' 
-                            OR (person.sexual_orientation = 'HOMO' AND person.gender = '{$user->gender}')
-                            OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}')
-                           )";
-
-        $sql .= " AND person.marital_status = 'SOLTERO' \n";
-        $sql .= "AND person.cupido = 1\n";
-        $sql .= "AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20\n";
+        $sql .= " FROM person\n WHERE $common_filter \n";
 
         $subsql = $sql;
 
@@ -99,13 +107,7 @@ class Cupido extends Service {
         if (empty($list) || is_null($list)) { // If not matchs, return random profiles
 
             $sql = "SELECT email FROM person 
-                    WHERE email <> '{$request->email}'
-                      AND cupido = 1 
-                      AND NOT EXISTS (
-                                SELECT * FROM __cupido_ignores 
-                                WHERE __cupido_ignores.email2 <> person.email
-                      )
-                    ORDER BY rand() LIMIT 5";
+                    WHERE $common_filter ORDER BY rand() LIMIT 5";
 
             $list = $this->db()->deepQuery($sql);
             $random = true;
@@ -128,8 +130,16 @@ class Cupido extends Service {
             }
 
 
-        // Building descriptions
+        // Not found :(
+        if (!isset($list[0])) {
+            $response = new Response();
+            $response->setResponseSubject('No encontramos perfiles para ti');
+            $response->createFromText('No encontramos perfiles para ti');
+            return $response;
+        }
 
+
+        // Building descriptions
         foreach ($matchs as $k => $m) {
             $desc = '';
 
@@ -154,7 +164,8 @@ class Cupido extends Service {
 
             $find = $this->db()->deepQuery("SELECT abs(datediff(CURRENT_DATE,date_of_birth)) / 365 as age FROM person WHERE email = '{$m->email}';");
 
-            $desc .= ' de ' . intval($find[0]->age) . ' a&ntilde;os';
+            if (intval($find[0]->age) >= 18)
+                $desc .= ' de ' . intval($find[0]->age) . ' a&ntilde;os';
 
             if (!empty($m->sking))
                 $desc .= ', piel ' . $m->skin;
@@ -215,13 +226,12 @@ class Cupido extends Service {
      */
     private function isMember($email) {
 
-        $sql = "SELECT cupido FROM person WHERE email = '$email'";
+        $sql = "SELECT cupido FROM person WHERE email = '$email' AND cupido = 1";
 
         $find = $this->db()->deepQuery($sql);
 
         if (isset($find[0]))
-            if (intval($find[0]->cupido) === 1)
-                return true;
+            return true;
 
         return false;
     }
@@ -274,22 +284,22 @@ class Cupido extends Service {
             return $response;
         }
 
-        $sql = "INSERT INTO __cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
+        $sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
         $this->db()->deepQuery($sql);
 
         $response1 = new Response();
         $response1->setResponseSubject('A usted le gusta ' . $email);
-        
+
         if (empty($user->full_name))
             $user->full_name = $email;
-            
+
         $response1->createFromTemplate('like.tpl', array('full_name' => $user->full_name, 'admirador' => $admirador_caption));
 
         $user = $this->utils->getPerson($request->email);
 
         $response2 = new Response();
         $response2->setResponseEmail($email);
-        $response2->setResponseSubject('Tienes '.$admirador_caption);
+        $response2->setResponseSubject('Tienes ' . $admirador_caption);
         $response2->createFromText("Has recibido este correo porque {$user->full_name} ({$user->email}) ha indicado que le gustas.");
 
         return array($response1, $response2);
@@ -300,7 +310,7 @@ class Cupido extends Service {
      */
     private function isLike($email1, $email2) {
 
-        $sql = "SELECT * FROM __cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
+        $sql = "SELECT * FROM _cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
         $find = $this->db()->deepQuery($sql);
 
         if (isset($find[0]))
@@ -337,7 +347,7 @@ class Cupido extends Service {
             return $response;
         }
 
-        $sql = "INSERT INTO __cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+        $sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
         $this->db()->deepQuery($sql);
 
         $response = new Response();
@@ -351,7 +361,7 @@ class Cupido extends Service {
      * Search if email1 ignore email2
      */
     private function isIgnore($email1, $email2) {
-        $sql = "SELECT * FROM __cupido_ignores WHERE email1 = '$email1' AND email2 = '$email2';";
+        $sql = "SELECT * FROM _cupido_ignores WHERE email1 = '$email1' AND email2 = '$email2';";
         $find = $this->db()->deepQuery($sql);
 
         if (isset($find[0]))
