@@ -14,4 +14,5 @@
     {link href="CUPIDO LIKE {$item->email}" caption="Me gusta"} | 
     {link href="CUPIDO IGNORAR {$item->email}" caption="Ignorar"}
     </td></tr></table>
+    <hr/>
 {/foreach}

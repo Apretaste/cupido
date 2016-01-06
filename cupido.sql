@@ -1,46 +1,28 @@
--- ----------------------------
--- Function structure for SPLIT_STR
--- ----------------------------
-DELIMITER ;;
-CREATE FUNCTION `SPLIT_STR`(
-  x VARCHAR(255),
-  delim VARCHAR(12),
-  pos INT
-) RETURNS varchar(255) CHARSET latin1
-RETURN REPLACE(SUBSTRING(SUBSTRING_INDEX(x, delim, pos),
-       LENGTH(SUBSTRING_INDEX(x, delim, pos -1)) + 1),
-       delim, '');;
-DELIMITER ;
+ALTER TABLE person ADD COLUMN cupido bit DEFAULT 1;
+ALTER TABLE person ADD sexual_orientation ENUM('BI','HETERO','HOMO') CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT 'HETERO';
 
-
--- ----------------------------
--- Table structure for _cupido_ignores
--- ----------------------------
-CREATE TABLE `_cupido_ignores` (
+CREATE TABLE `__cupido_ignores` (
   `email1` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
   `email2` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
-  `ignore_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+  `ignore_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`email1`,`email2`)
+);
 
--- ----------------------------
--- Table structure for _cupido_likes
--- ----------------------------
-CREATE TABLE `_cupido_likes` (
+CREATE TABLE `__cupido_likes` (
   `email1` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
   `email2` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
-  `like_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+  `like_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`email1`,`email2`)
+);
 
--- ----------------------------
--- Table structure for _province_distance
--- ----------------------------
 CREATE TABLE `_province_distance` (
   `province1` enum('PINAR_DEL_RIO','LA_HABANA','ARTEMISA','MAYABEQUE','MATANZAS','VILLA_CLARA','CIENFUEGOS','SANTI_SPIRITUS','CIEGO_DE_AVILA','CAMAGUEY','LAS_TUNAS','HOLGUIN','GRANMA','SANTIAGO_DE_CUBA','GUANTANAMO','ISLA_DE_LA_JUVENTUD') COLLATE utf8_unicode_ci NOT NULL,
   `province2` enum('PINAR_DEL_RIO','LA_HABANA','ARTEMISA','MAYABEQUE','MATANZAS','VILLA_CLARA','CIENFUEGOS','SANTI_SPIRITUS','CIEGO_DE_AVILA','CAMAGUEY','LAS_TUNAS','HOLGUIN','GRANMA','SANTIAGO_DE_CUBA','GUANTANAMO','ISLA_DE_LA_JUVENTUD') COLLATE utf8_unicode_ci NOT NULL,
   `distance` int(11) NOT NULL,
   PRIMARY KEY (`province1`,`province2`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+);
 
+ 
 INSERT INTO `_province_distance` VALUES ('PINAR_DEL_RIO', 'PINAR_DEL_RIO', '0');
 INSERT INTO `_province_distance` VALUES ('PINAR_DEL_RIO', 'LA_HABANA', '2');
 INSERT INTO `_province_distance` VALUES ('PINAR_DEL_RIO', 'ARTEMISA', '1');
@@ -173,10 +155,13 @@ INSERT INTO `_province_distance` VALUES ('SANTIAGO_DE_CUBA', 'ISLA_DE_LA_JUVENTU
 INSERT INTO `_province_distance` VALUES ('GUANTANAMO', 'GUANTANAMO', '0');
 INSERT INTO `_province_distance` VALUES ('GUANTANAMO', 'ISLA_DE_LA_JUVENTUD', '11');
 
-
-
-
--- ----------------------------
--- View structure for _province_proximity
--- ----------------------------
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `_province_proximity` AS select `_province_distance`.`province1` AS `province1`,`_province_distance`.`province2` AS `province2`,`_province_distance`.`distance` AS `distance`,(select (100 - ((`_province_distance`.`distance` / (select max(`dist2`.`distance`) from `_province_distance` `dist2`)) * 100))) AS `proximity` from `_province_distance`;
+DELIMITER ;;
+CREATE FUNCTION `SPLIT_STR`(
+  x VARCHAR(255),
+  delim VARCHAR(12),
+  pos INT
+) RETURNS varchar(255) CHARSET latin1
+RETURN REPLACE(SUBSTRING(SUBSTRING_INDEX(x, delim, pos),
+       LENGTH(SUBSTRING_INDEX(x, delim, pos -1)) + 1),
+       delim, '');;
+DELIMITER ;
