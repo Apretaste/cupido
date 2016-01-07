@@ -96,7 +96,7 @@ class Cupido extends Service {
         $sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + percent_preferences as percent_match\n";
         $sql .= "FROM ($subsql) as subq2\n";
         $sql .= "ORDER BY percent_match DESC\n";
-        $sql .= "LIMIT 5;\n";
+        $sql .= "LIMIT 3;\n";
 
         // Executing the query
         $list = $this->db()->deepQuery(trim($sql));
@@ -108,7 +108,7 @@ class Cupido extends Service {
         if (empty($list) || is_null($list)) { // If not matchs, return random profiles
 
             $sql = "SELECT email FROM person 
-                    WHERE $common_filter ORDER BY rand() LIMIT 5";
+                    WHERE $common_filter ORDER BY rand() LIMIT 3";
 
             $list = $this->db()->deepQuery($sql);
             $random = true;
@@ -127,9 +127,13 @@ class Cupido extends Service {
                 if ($profile->full_name == '')
                     $profile->full_name = $profile->email;
 
+                $profile->button_like = true;
+
+                if ($this->isLike($request->email, $profile->email))
+                    $profile->button_like = false;
+                    
                 $matchs[] = $profile;
             }
-
 
         // Not found :(
         if (!isset($list[0])) {
@@ -205,6 +209,8 @@ class Cupido extends Service {
             }
 
             $matchs[$k]->age = intval($find[0]->age);
+
+            $desc = str_replace('  ', ' ', $desc);
             $matchs[$k]->description = $desc;
         }
 
@@ -255,6 +261,9 @@ class Cupido extends Service {
 
     /**
      * Subservice LIKE
+     * 
+     * @param Request $request
+     * @return Reponse/Array
      */
     public function _like(Request $request) {
 
@@ -271,39 +280,90 @@ class Cupido extends Service {
         if ($current_user->gender = 'M')
             $admirador_caption = 'un admirador';
 
-        $email = trim($request->query);
+        $emails = $this->getEmailsFromRequest($request);
 
-        if (!$this->isMember($email))
-            return $this->getNotMemberResponse($email);
+        $responses = array();
 
-        $user = $this->utils->getPerson($email);
+        $likes = array();
 
-        if ($this->isLike($request->email, $email)) {
-            $response = new Response();
-            $response->setResponseSubject('Ya a ti te gusta el perfil' . $email);
-            $response->createFromText('Ya a ti te gusta el perfil ' . $email);
-            return $response;
+        foreach ($emails as $email) {
+
+            if (!$this->isMember($email))
+                return $this->getNotMemberResponse($email);
+
+            $user = $this->utils->getPerson($email);
+
+            if ($this->isLike($request->email, $email)) {
+                $likes[] = array(
+                    'full_name' => $user->full_name,
+                    'username' => $user->username,
+                    'ya' => true);
+                continue;
+            }
+
+            $sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
+            $this->db()->deepQuery($sql);
+
+            if (empty($user->full_name))
+                $user->full_name = $user->username;
+
+            $likes[] = array(
+                'full_name' => $user->full_name,
+                'username' => $user->username,
+                'ya' => false);
+
+            $user = $this->utils->getPerson($request->email);
+
+            $response2 = new Response();
+            $response2->setResponseEmail($email);
+            $response2->setResponseSubject('Tienes ' . $admirador_caption);
+            $response2->createFromText("Has recibido este correo porque {$user->full_name} ({$user->email}) ha indicado que le gustas.");
+
+            $responses[] = $response2;
         }
 
-        $sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
-        $this->db()->deepQuery($sql);
-
         $response1 = new Response();
-        $response1->setResponseSubject('A ti te gusta ' . $email);
+        $response1->setResponseSubject('Haz indicado que te gustan los siguientes perfiles');
 
         if (empty($user->full_name))
             $user->full_name = $email;
 
-        $response1->createFromTemplate('like.tpl', array('full_name' => $user->full_name, 'admirador' => $admirador_caption));
+        $response1->createFromTemplate('like.tpl', array('likes' => $likes, 'admirador' => $admirador_caption));
 
-        $user = $this->utils->getPerson($request->email);
+        $responses[] = $response1;
 
-        $response2 = new Response();
-        $response2->setResponseEmail($email);
-        $response2->setResponseSubject('Tienes ' . $admirador_caption);
-        $response2->createFromText("Has recibido este correo porque {$user->full_name} ({$user->email}) ha indicado que le gustas.");
+        return $responses;
+    }
 
-        return array($response1, $response2);
+    /**
+     * Return a list of emails from request query
+     * 
+     * @param Request $request
+     * @return array
+     */
+    private function getEmailsFromRequest($request) {
+
+        $query = explode(" ", $request->query);
+
+        $parts = array();
+
+        foreach ($query as $q) {
+            $part = trim($q);
+            if ($part !== '')
+                $parts[] = $part;
+        }
+
+        $emails = array();
+        foreach ($parts as $part) {
+            $find = $this->db()->deepQuery("SELECT email FROM person WHERE username = '{$part}';");
+
+            if (isset($find[0])) {
+                $emails[] = $find[0]->email;
+            } else
+                $emails[] = $part;
+        }
+
+        return $emails;
     }
 
     /**
@@ -329,31 +389,62 @@ class Cupido extends Service {
         if (!$this->isMember($request->email))
             return $this->getNotMemberResponse();
 
-        $email = trim($request->query);
+        $emails = $this->getEmailsFromRequest($request);
+        $ignores = array();
 
-        if ($email == $request->email) {
+        if (!isset($emails[0])) {
             $response = new Response();
-            $response->setResponseSubject('No puedes ignorarte a ti mismo');
-            $response->createFromText('No puedes ignorarte a ti mismo. Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.');
+            $response->setResponseSubject("Te falta especificar el perfil a ignorar");
+            $response->createFromText("No escribiste en el asunto los nombres de usuarios que deseas ignorar. Por ejemplo: CUPIDO IGNORAR pepe1");
             return $response;
         }
 
-        if (!$this->isMember($email))
-            return $this->getNotMemberResponse($email);
+        foreach ($emails as $email) {
 
-        if ($this->isIgnore($request->email, $email)) {
-            $response = new Response();
-            $response->setResponseSubject('Ya habias ignorado a ' . $email);
-            $response->createFromText('Ya hab&iacute;as ignorado a ' . $email);
-            return $response;
+            $person = $this->utils->getPerson($email);
+
+            if ($email == $request->email) {
+                $ignores[] = array(
+                    'username' => false,
+                    'message_before' => 'No puedes ignorarate a ti mismo.',
+                    'message_after' => 'Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.');
+                continue;
+            }
+
+            if (!$this->isMember($email)) {
+                $un = $email;
+
+                if (is_object($person))
+                    $un = $person->username;
+
+                $ignores[] = array(
+                    'username' => $un,
+                    'message_before' => '',
+                    'message_after' => ' no es miembro de la red de cupido en Apretaste.');
+                continue;
+            }
+
+            if ($this->isIgnore($request->email, $email)) {
+                $ignores[] = array(
+                    'username' => $person->username,
+                    'message_before' => 'A ',
+                    'message_after' => ' ya lo habias ignorado.');
+                continue;
+            }
+
+            $sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+            $this->db()->deepQuery($sql);
+
+            $ignores[] = array(
+                'username' => $person->username,
+                'message_before' => 'Ahora sabemos que ingoras a ',
+                'message_after' => '');
+
         }
-
-        $sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
-        $this->db()->deepQuery($sql);
 
         $response = new Response();
-        $response->setResponseSubject('Haz ignorado a ' . $email);
-        $response->createFromText('Ahora sabemos que ignoras el perfil ' . $email . ' por lo que no te saldr&aacute; m&aacute;s en los resultados de b&uacute;squeda.');
+        $response->setResponseSubject('Haz ignorado los siguientes perfiles');
+        $response->createFromTemplate('ignore.tpl', array('ignores' => $ignores));
 
         return $response;
     }
