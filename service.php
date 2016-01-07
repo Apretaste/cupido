@@ -248,8 +248,8 @@ class Cupido extends Service {
         $this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
 
         $response = new Response();
-        $response->setResponseSubject('Usted ha salido de la red de Cupido en Apretaste');
-        $response->createFromText('Usted ha salido de la red de Cupido en Apretaste');
+        $response->setResponseSubject('Haz salido de la red de Cupido en Apretaste');
+        $response->createFromText('Haz salido de la red de Cupido en Apretaste. Agradeceremos que nos escr&iacute;bas al soporte para saber tu motivo.');
         return $response;
     }
 
@@ -280,8 +280,8 @@ class Cupido extends Service {
 
         if ($this->isLike($request->email, $email)) {
             $response = new Response();
-            $response->setResponseSubject('Ya a usted le gusta el perfil' . $email);
-            $response->createFromText('Ya a usted le gusta el perfil ' . $email);
+            $response->setResponseSubject('Ya a ti te gusta el perfil' . $email);
+            $response->createFromText('Ya a ti te gusta el perfil ' . $email);
             return $response;
         }
 
@@ -289,7 +289,7 @@ class Cupido extends Service {
         $this->db()->deepQuery($sql);
 
         $response1 = new Response();
-        $response1->setResponseSubject('A usted le gusta ' . $email);
+        $response1->setResponseSubject('A ti te gusta ' . $email);
 
         if (empty($user->full_name))
             $user->full_name = $email;
@@ -352,8 +352,8 @@ class Cupido extends Service {
         $this->db()->deepQuery($sql);
 
         $response = new Response();
-        $response->setResponseSubject('Usted ha ignorado a ' . $email);
-        $response->createFromText('Ahora sabemos que usted ignora el perfil ' . $email);
+        $response->setResponseSubject('Haz ignorado a ' . $email);
+        $response->createFromText('Ahora sabemos que ignoras el perfil ' . $email . ' por lo que no te saldr&aacute; m&aacute;s en los resultados de b&uacute;squeda.');
 
         return $response;
     }
