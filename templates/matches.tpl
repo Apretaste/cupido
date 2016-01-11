@@ -1,7 +1,7 @@
 {if $random}
 	<h1>Cinco personas que puede te interesen</h1>
 {else}
-	<h1>Personas afines a ti</h1>
+	<h1>Personas afines a usted</h1>
 {/if}
 
 {space10}
