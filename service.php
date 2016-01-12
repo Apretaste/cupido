@@ -458,7 +458,7 @@ class Cupido extends Service {
 		// get the type of body
 		$bodyType = "";
 		if ($profile->body_type == "DELGADO") $bodyType = "soy flac$genderFinalVowel";
-		if ($profile->body_type == "MEDIO") $bodyType = "no soy de flac$genderFinalVowel ni grues$genderFinalVowel";
+		if ($profile->body_type == "MEDIO") $bodyType = "no soy flac$genderFinalVowel ni grues$genderFinalVowel";
 		if ($profile->body_type == "EXTRA") $bodyType = "tengo unas libritas de m&aacute;s";
 		if ($profile->body_type == "ATLETICO") $bodyType = "tengo un cuerpazo atl&eacute;tico";
 
@@ -490,10 +490,6 @@ class Cupido extends Service {
 		if ($profile->province == "GUANTANAMO") $province = "Guant&aacute;namo";
 		if ($profile->province == "ISLA_DA_LA_JUVENTUD") $province = "Isla de la Juventud";
 
-		// full location
-		$place  = empty($province) ? "Cuban$genderFinalVowel" : "de $province";
-		$location = ". Soy $place";
-
 		// get highest educational level
 		$education = "";
 		if ($profile->highest_school_level == "PRIMARIO") $education = "tengo sexto grado";
@@ -503,29 +499,21 @@ class Cupido extends Service {
 		if ($profile->highest_school_level == "POSTGRADUADO") $education = "tengo estudios de postgrado";
 		if ($profile->highest_school_level == "DOCTORADO") $education = "tengo un doctorado";
 
-		// get marital status
-		$maritalStatus = "";
-		if ($profile->marital_status == "SOLTERO") $maritalStatus = "estoy solter$genderFinalVowel";
-		if ($profile->marital_status == "SALIENDO") $maritalStatus = "estoy saliendo con alguien";
-		if ($profile->marital_status == "COMPROMETIDO") $maritalStatus = "estoy comprometid$genderFinalVowel";
-		if ($profile->marital_status == "CASADO") $maritalStatus = "soy casad$genderFinalVowel";
-
 		// get occupation
 		$occupation = (empty($profile->occupation) || strlen($profile->occupation)<5) ? false : strtolower($profile->occupation);
 
 		// create the message
 		$message = "";
 		if ( ! empty($profile->first_name)) $message .= "me llamo ".ucfirst(trim($profile->first_name)) . ", ";
+		if ( ! empty($province)) $message .= "soy de $province, ";
 		if ( ! empty($age)) $message .= "tengo $age a&ntilde;os, ";
 		if ( ! empty($skin)) $message .= "soy $skin, ";
 		if ( ! empty($eyes)) $message .= "de ojos $eyes, ";
 		if ( ! empty($eyes)) $message .= "soy de pelo $hair, ";
-		if ( ! empty($bodyType)) $message .= "y $bodyType";
+		if ( ! empty($bodyType)) $message .= "$bodyType, ";
+		if ( ! empty($education)) $message .= "$education, ";
 		$message = trim($message, ", ");
-		$message .= $location;
-		if ( ! empty($education)) $message .= ", $education";
-		if ($occupation) $message .= ", trabajo como $occupation";
-		if ( ! empty($maritalStatus)) $message .= " y $maritalStatus";
+		if ($occupation) $message .= " y trabajo como $occupation";
 		$message .= ".";
 
 		return ucfirst($message);
