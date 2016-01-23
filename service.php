@@ -83,6 +83,7 @@ class Cupido extends Service {
 		$sql .= "(select person.skin = '{$user->skin}') * 5 as same_skin,\n" . "(select person.picture is not null) * 20 as having_picture,\n";
 		$sql .= "(1 - (abs(datediff(person.date_of_birth, '{$user->date_of_birth}'))/365 / 20)) * 15 as age_proximity,\n";
 		$sql .= "(select person.body_type = '{$user->body_type}')* 5 as same_body_type,\n";
+		$sql .= "(select person.religion = '{$user->religion}')* 20 as same_religion,\n";
 
 		if ($total_interests > 0)
 			$sql .= "(select vv FROM ($subsql) as subq1 WHERE email = person.email) / $total_interests * 25 as percent_preferences\n";
@@ -93,7 +94,7 @@ class Cupido extends Service {
 
 		$subsql = $sql;
 
-		$sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + percent_preferences as percent_match\n";
+		$sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match\n";
 		$sql .= "FROM ($subsql) as subq2\n";
 		$sql .= "ORDER BY percent_match DESC\n";
 		$sql .= "LIMIT 3;\n";
