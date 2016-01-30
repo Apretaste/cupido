@@ -14,7 +14,7 @@
 			    	{noimage width="150" height="100" text="Tristemente<br/>aun sin foto<br/>:'-("}
 			    {else} 
 	    			<table cellpadding="3"><tr><td bgcolor="#202020">
-					{img src="{$item->picture}" alt="Picture" width="150"}
+					{img src="{$item->thumbnail}" alt="Picture" width="150"}
 					</td></tr></table>
 				{/if}
 		    </td>

@@ -1,7 +1,7 @@
 <?php
 
-class Cupido extends Service {
-
+class Cupido extends Service
+{
 	private $db = null;
 
 	/**
@@ -10,8 +10,8 @@ class Cupido extends Service {
 	 * @param Request
 	 * @return Response
 	 **/
-	public function _main(Request $request) {
-
+	public function _main(Request $request)
+	{
 		$user = $this->utils->getPerson($request->email);
 		$completion = $this->utils->getProfileCompletion($request->email);
 
@@ -28,44 +28,25 @@ class Cupido extends Service {
 		$this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
 
 		// Match algorithm - building sql query
-
-		$common_filter = " person.email <> '{$request->email}'
-                      AND cupido = 1 
-                      AND NOT EXISTS (
-                                SELECT * FROM _cupido_ignores 
-                                WHERE _cupido_ignores.email2 = person.email
-                      ) ";
-
-		if ($user->sexual_orientation == 'HETERO')
-			$common_filter .= " AND person.gender <> '{$user->gender}' AND person.sexual_orientation <> 'HOMO'";
-
-		if ($user->sexual_orientation == 'HOMO')
-			$common_filter .= " AND person.gender = '{$user->gender}' AND person.sexual_orientation <> 'HETERO'";
-
-		if ($user->sexual_orientation == 'BI')
-			$common_filter .= " AND (person.sexual_orientation = 'BI' 
-                            OR (person.sexual_orientation = 'HOMO' AND person.gender = '{$user->gender}')
-                            OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}')
-                           )";
-
-
+		$common_filter = " person.email <> '{$request->email}' AND cupido = 1 AND NOT EXISTS (SELECT * FROM _cupido_ignores WHERE _cupido_ignores.email2 = person.email) ";
+		if ($user->sexual_orientation == 'HETERO') $common_filter .= " AND person.gender <> '{$user->gender}' AND person.sexual_orientation <> 'HOMO'";
+		if ($user->sexual_orientation == 'HOMO') $common_filter .= " AND person.gender = '{$user->gender}' AND person.sexual_orientation <> 'HETERO'";
+		if ($user->sexual_orientation == 'BI') $common_filter .= " AND (person.sexual_orientation = 'BI' OR (person.sexual_orientation = 'HOMO' AND person.gender = '{$user->gender}') OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}'))";
 		$common_filter .= " AND person.marital_status = 'SOLTERO' \n";
 		$common_filter .= " AND person.cupido = 1\n";
 		$common_filter .= " AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20";
 
 		$sql = '';
-
-		if (is_array($user->interests)) {
-
+		if (is_array($user->interests))
+		{
 			// Interests
-
 			$sql = "SELECT email, sum(v) as vv FROM(\n";
 			$j = 0;
 			$ints = strtolower(implode(",", $user->interests));
-			for ($i = 1; $i <= 10; $i++) {
+			for ($i = 1; $i <= 10; $i++)
+			{
 				$j++;
-				if ($j > 1)
-					$sql .= ' UNION ALL ';
+				if ($j > 1) $sql .= ' UNION ALL ';
 				$sql .= " select email, IF('{$ints}' LIKE CONCAT('%',lower(split_str(interests,',',{$i})),'%'),1,0) as v from person WHERE CONCAT('%',lower(split_str(interests,',',{$i})),'%') <> '%%' \n";
 			}
 			$sql .= ") as subq GROUP BY email\n";
@@ -86,15 +67,10 @@ class Cupido extends Service {
 		$sql .= "(select person.body_type = '{$user->body_type}')* 5 as same_body_type,\n";
 		$sql .= "(select person.religion = '{$user->religion}')* 20 as same_religion,\n";
 
-		if ($total_interests > 0)
-			$sql .= "(select vv FROM ($subsql) as subq1 WHERE email = person.email) / $total_interests * 25 as percent_preferences\n";
-		else
-			$sql .= "0 as percent_preferences\n";
-
+		if ($total_interests > 0) $sql .= "(select vv FROM ($subsql) as subq1 WHERE email = person.email) / $total_interests * 25 as percent_preferences\n";
+		else $sql .= "0 as percent_preferences\n";
 		$sql .= " FROM person\n WHERE $common_filter \n";
-
 		$subsql = $sql;
-
 		$sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match\n";
 		$sql .= "FROM ($subsql) as subq2\n";
 		$sql .= "ORDER BY percent_match DESC\n";
@@ -107,40 +83,34 @@ class Cupido extends Service {
 		$images = array();
 		$random = false;
 
-		if (empty($list) || is_null($list)) { // If not matchs, return random profiles
-
-			$sql = "SELECT email FROM person 
-                    WHERE $common_filter ORDER BY rand() LIMIT 3";
-
+		// If not matchs, return random profiles
+		if (empty($list) || is_null($list))
+		{ 
+			$sql = "SELECT email FROM person WHERE $common_filter ORDER BY rand() LIMIT 3";
 			$list = $this->db()->deepQuery($sql);
 			$random = true;
 		}
 
 		// Proccesing result
 		if (is_array($list))
-			foreach ($list as $item) {
+		{
+			foreach ($list as $item)
+			{
 				$profile = $this->utils->getPerson($item->email);
-
-				if ($profile === false)
-					continue;
-
-				$images[] = empty($profile->picture) ? array() : array($profile->picture);
-
-				if ($profile->full_name == '')
-					$profile->full_name = $profile->email;
-
+				if ($profile === false) continue;
+				$images[] = empty($profile->thumbnail) ? array() : array($profile->thumbnail);
+				if ($profile->full_name == '') $profile->full_name = $profile->email;
 				$profile->button_like = true;
-
-				if ($this->isLike($request->email, $profile->email))
-					$profile->button_like = false;
-
+				if ($this->isLike($request->email, $profile->email)) $profile->button_like = false;
 				$profile->description = $this->getProfileDescription($profile);
 
 				$matchs[] = $profile;
 			}
+		}
 
 		// Not found :(
-		if (  ! isset($list[0])) {
+		if ( ! isset($list[0]))
+		{
 			$response = new Response();
 			$response->setResponseSubject('No encontramos perfiles para ti');
 			$response->createFromText('No encontramos perfiles para ti');
@@ -151,8 +121,7 @@ class Cupido extends Service {
 		$response = new Response();
 		$response->setResponseSubject('Cupido: Personas de tu interes');
 
-		if ($random == true)
-			$response->setResponseSubject('No encontramos perfiles para ti, te mostamos algunos aleatorios');
+		if ($random == true) $response->setResponseSubject('No encontramos perfiles para ti, te mostamos algunos aleatorios');
 
 		$response->createFromTemplate('matches.tpl', array('matchs' => $matchs, 'random' => $random), $images);
 
@@ -160,29 +129,14 @@ class Cupido extends Service {
 	}
 
 	/**
-	 * Return true if $email is member of the network cupido
-	 * 
-	 * @param string $email
-	 */
-	private function isMember($email) {
-
-		$sql = "SELECT cupido FROM person WHERE email = '$email' AND cupido = 1";
-
-		$find = $this->db()->deepQuery($sql);
-
-		if (isset($find[0]))
-			return true;
-
-		return false;
-	}
-
-	/**
 	 * Subservice SALIR
 	 */
-	public function _salir(Request $request) {
-
-		if (  ! $this->isMember($request->email))
+	public function _salir(Request $request)
+	{
+		if ( ! $this->isMember($request->email))
+		{
 			return $this->getNotMemberResponse();
+		}
 
 		$this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
 
@@ -198,20 +152,21 @@ class Cupido extends Service {
 	 * @param Request $request
 	 * @return Reponse/Array
 	 */
-	public function _like(Request $request) {
-
-		if (  ! $this->isMember($request->email))
+	public function _like(Request $request)
+	{
+		// check if you are a member
+		if ( ! $this->isMember($request->email))
+		{
 			return $this->getNotMemberResponse();
+		}
 
-		$current_user = $this->utils->getPerson($request->email);
+		// get the person whom you hit like 
+		$currentUser = $this->utils->getPerson($request->email);
 
+		// get caption depending of the gender
 		$admirador_caption = 'un(a) admirador(a)';
-
-		if ($current_user->gender = 'F')
-			$admirador_caption = 'una admiradora';
-
-		if ($current_user->gender = 'M')
-			$admirador_caption = 'un admirador';
+		if ($currentUser->gender = 'F') $admirador_caption = 'una admiradora';
+		if ($currentUser->gender = 'M') $admirador_caption = 'un admirador';
 
 		$emails = $this->getEmailsFromRequest($request);
 
@@ -221,12 +176,12 @@ class Cupido extends Service {
 
 		foreach ($emails as $email) {
 
-			if (  ! $this->isMember($email))
-				return $this->getNotMemberResponse($email);
+			if ( ! $this->isMember($email)) return $this->getNotMemberResponse($email);
 
 			$user = $this->utils->getPerson($email);
 
-			if ($this->isLike($request->email, $email)) {
+			if ($this->isLike($request->email, $email))
+			{
 				$likes[] = array(
 					'full_name' => $user->full_name,
 					'username' => $user->username,
@@ -269,31 +224,117 @@ class Cupido extends Service {
 	}
 
 	/**
+	 * Subservice OCULTAR
+	 *
+	 * @author kuma
+	 * @param Request
+	 * @return Response
+	 */
+	public function _ocultar(Request $request)
+	{
+		if ( ! $this->isMember($request->email))
+			return $this->getNotMemberResponse();
+	
+		$emails = $this->getEmailsFromRequest($request);
+		$ignores = array();
+	
+		if ( ! isset($emails[0])) {
+			$response = new Response();
+			$response->setResponseSubject("Te falta especificar el perfil a ocultar");
+			$response->createFromText("No escribiste en el asunto los nombres de usuarios que deseas ocultar. Por ejemplo: CUPIDO OCULTAR pepe1");
+			return $response;
+		}
+	
+		foreach ($emails as $email) {
+	
+			$person = $this->utils->getPerson($email);
+	
+			if ($email == $request->email) {
+				$ignores[] = array(
+						'username' => false,
+						'message_before' => 'No puedes ocultarate a ti mismo.',
+						'message_after' => 'Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.');
+				continue;
+			}
+	
+			if ( ! $this->isMember($email)) {
+				$un = $email;
+	
+				if (is_object($person))
+					$un = $person->username;
+	
+				$ignores[] = array(
+						'username' => $un,
+						'message_before' => '',
+						'message_after' => ' no es miembro de la red de cupido en Apretaste.');
+				continue;
+			}
+	
+			if ($this->isIgnore($request->email, $email)) {
+				$ignores[] = array(
+						'username' => $person->username,
+						'message_before' => 'A ',
+						'message_after' => ' ya lo hab&iacute;as ocultado.');
+				continue;
+			}
+	
+			$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+			$this->db()->deepQuery($sql);
+	
+			$ignores[] = array(
+					'username' => $person->username,
+					'message_before' => 'Ocultaste satisfactoriamente a ',
+					'message_after' => '');
+	
+		}
+	
+		$response = new Response();
+		$response->setResponseSubject('Haz ocultado los siguientes perfiles');
+		$response->createFromTemplate('ignore.tpl', array('ignores' => $ignores));
+	
+		return $response;
+	}
+
+	/**
+	 * Return true if $email is member of the network cupido
+	 *
+	 * @author kuma
+	 * @param String $email
+	 * @return Boolean
+	 */
+	private function isMember($email)
+	{
+		$sql = "SELECT cupido FROM person WHERE email = '$email' AND cupido = 1";
+		$find = $this->db()->deepQuery($sql);
+
+		if (isset($find[0])) return true;
+		return false;
+	}
+
+	/**
 	 * Return a list of emails from request query
 	 * 
+	 * @author kuma
 	 * @param Request $request
 	 * @return array
 	 */
-	private function getEmailsFromRequest($request) {
-
+	private function getEmailsFromRequest($request)
+	{
 		$query = explode(" ", $request->query);
-
 		$parts = array();
 
-		foreach ($query as $q) {
+		foreach ($query as $q)
+		{
 			$part = trim($q);
-			if ($part !== '')
-				$parts[] = $part;
+			if ($part !== '') $parts[] = $part;
 		}
 
 		$emails = array();
-		foreach ($parts as $part) {
+		foreach ($parts as $part)
+		{
 			$find = $this->db()->deepQuery("SELECT email FROM person WHERE username = '{$part}';");
-
-			if (isset($find[0])) {
-				$emails[] = $find[0]->email;
-			} else
-				$emails[] = $part;
+			if (isset($find[0])) $emails[] = $find[0]->email;
+			else $emails[] = $part;
 		}
 
 		return $emails;
@@ -315,74 +356,6 @@ class Cupido extends Service {
 	}
 
 	/**
-	 * Subservice OCULTAR
-	 */
-	public function _ocultar(Request $request) {
-
-		if (  ! $this->isMember($request->email))
-			return $this->getNotMemberResponse();
-
-		$emails = $this->getEmailsFromRequest($request);
-		$ignores = array();
-
-		if (  ! isset($emails[0])) {
-			$response = new Response();
-			$response->setResponseSubject("Te falta especificar el perfil a ocultar");
-			$response->createFromText("No escribiste en el asunto los nombres de usuarios que deseas ocultar. Por ejemplo: CUPIDO OCULTAR pepe1");
-			return $response;
-		}
-
-		foreach ($emails as $email) {
-
-			$person = $this->utils->getPerson($email);
-
-			if ($email == $request->email) {
-				$ignores[] = array(
-					'username' => false,
-					'message_before' => 'No puedes ocultarate a ti mismo.',
-					'message_after' => 'Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.');
-				continue;
-			}
-
-			if (  ! $this->isMember($email)) {
-				$un = $email;
-
-				if (is_object($person))
-					$un = $person->username;
-
-				$ignores[] = array(
-					'username' => $un,
-					'message_before' => '',
-					'message_after' => ' no es miembro de la red de cupido en Apretaste.');
-				continue;
-			}
-
-			if ($this->isIgnore($request->email, $email)) {
-				$ignores[] = array(
-					'username' => $person->username,
-					'message_before' => 'A ',
-					'message_after' => ' ya lo hab&iacute;as ocultado.');
-				continue;
-			}
-
-			$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
-			$this->db()->deepQuery($sql);
-
-			$ignores[] = array(
-				'username' => $person->username,
-				'message_before' => 'Ocultaste satisfactoriamente a ',
-				'message_after' => '');
-
-		}
-
-		$response = new Response();
-		$response->setResponseSubject('Haz ocultado los siguientes perfiles');
-		$response->createFromTemplate('ignore.tpl', array('ignores' => $ignores));
-
-		return $response;
-	}
-
-	/**
 	 * Search if email1 ignore email2
 	 */
 	private function isIgnore($email1, $email2) {
@@ -397,35 +370,39 @@ class Cupido extends Service {
 	}
 
 	/**
-	 * Return common not member response 
+	 * Return common not member response
+	 * 
+	 * @author kuma
+	 * @param Mixed
+	 * @return Response
 	 */
-	private function getNotMemberResponse($email = null) {
+	private function getNotMemberResponse($email = null)
+	{
 		$response = new Response();
 
-		if (is_null($email)) {
-			$response->setResponseSubject('Usted no forma parte la red de Cupido en Apretaste');
-			$response->createFromText('Usted no forma parte la red de Cupido en Apretaste');
-		} else {
-			$response = new Response();
-			$response->setResponseSubject('El usuario no forma parte la red de Cupido en Apretaste');
-			$response->createFromText('El usuario ' . $email . ' no forma parte la red de Cupido en Apretaste');
+		if (is_null($email))
+		{
+			$response->setResponseSubject("Usted no forma parte la red Cupido");
+			$response->createFromText("Usted no forma parte la red Cupido");
+		}
+		else
+		{
+			$response->setResponseSubject("$email no forma parte la red Cupido");
+			$response->createFromText("El usuario $email no forma parte la red Cupido");
 		}
 
 		return $response;
 	}
 
-
 	/**
 	 * Return description of profile as a paragraph
 	 * 
-	 * @param mixed $email
+	 * @author kuma
+	 * @param Object $profile
 	 * @return string
 	 */
-	private function getProfileDescription($email)
+	private function getProfileDescription($profile)
 	{
-		if (is_object($email)) $profile = $email;
-		else $profile = $this->utils->getPerson($email);
-
 		// get the age
 		$age = empty($profile->date_of_birth) ? "" : date_diff(date_create($profile->date_of_birth), date_create('today'))->y;
 
@@ -523,10 +500,13 @@ class Cupido extends Service {
 
 	/**
 	 * DB connection singleton
+	 * 
+	 * @author kuma
+	 * @return Connection
 	 */
-	private function db() {
-		if (is_null($this->db))
-			$this->db = new Connection();
+	private function db()
+	{
+		if (is_null($this->db)) $this->db = new Connection();
 		return $this->db;
 	}
 
