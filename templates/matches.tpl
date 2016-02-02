@@ -24,7 +24,7 @@
  	 			<center>
     				{if $item->button_like}{button href="CUPIDO LIKE {$item->username}" caption="&#10084; Me gusta" color="green" size="small"}{/if} 
     				{button href="CUPIDO OCULTAR {$item->username}" caption="&#10008; Ocultar" color="red" size="small"}
-    				{button href="NOTA {$item->username} Hola, quisiera conocerte" caption="Enviar nota" color="grey" body="Cambie la nota en el asunto por la que usted desea" size="small"}
+    				{button href="NOTA {$item->username} Hola @{$item->username}. Me alegro encontrar tu perfil revisando cupido. Pareces una persona interesante y tenemos intereses en comun. Me gustaria llegar a conocerte mejor. Por favor respondeme." caption="Enviar nota" color="grey" body="Cambie la nota en el asunto por la que usted desea" size="small"}
     			</center>
     		</td>
     	</tr>
@@ -38,6 +38,6 @@
 
 <center>
 	<p><small>Los usuarios que usted oculte nunca se le mostrar&aacute;n nuevamente</small></p>
-	{button href="CUPIDO OCULTAR {foreach name=matchs item=item from=$matchs}{$item->username}{/foreach}" caption="&#10008; Ocultar todos" color="red"}
+	{button href="CUPIDO OCULTAR {foreach name=matchs item=item from=$matchs}{$item->username} {/foreach}" caption="&#10008; Ocultar todos" color="red"}
 	{button href="NOTA" caption="Ver notas" color="grey"}
 </center>
