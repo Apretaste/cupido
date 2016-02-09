@@ -148,11 +148,11 @@ class Cupido extends Service
             return $this->getNotMemberResponse();
         }
         
-        $this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
+        $this->db()->deepQuery("UPDATE person SET cupido = 0 WHERE email = '{$request->email}';");
         
         $response = new Response();
         $response->setResponseSubject('Haz salido de la red de Cupido en Apretaste');
-        $response->createFromText('Haz salido de la red de Cupido en Apretaste. Agradeceremos que nos escr&iacute;bas al soporte para saber tu motivo. Si deseas volver, simplemente usa el servicio.');
+        $response->createFromText('Haz salido de la red de Cupido en Apretaste. Si deseas volver, simplemente usa el servicio.');
         return $response;
     }
 

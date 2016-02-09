@@ -40,5 +40,5 @@
 	<p><small>Los usuarios que usted oculte nunca se le mostrar&aacute;n nuevamente</small></p>
 	{button href="CUPIDO OCULTAR {foreach name=matchs item=item from=$matchs}{$item->username} {/foreach}" caption="&#10008; Ocultar todos" color="red"}
 	{button href="NOTA" caption="Ver notas" color="grey"}
-	{button href="CUPIDO SALIR" caption="Salir de Cupido" color="red"}
+	{button href="CUPIDO SALIR" caption="Salir de Cupido" color="grey"}
 </center>
