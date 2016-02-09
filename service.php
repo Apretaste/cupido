@@ -83,7 +83,7 @@ class Cupido extends Service
         $subsql = $sql;
         $sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match\n";
         $sql .= "FROM ($subsql) as subq2\n";
-        $sql .= "ORDER BY percent_match DESC\n";
+        $sql .= "ORDER BY percent_match DESC, email ASC\n";
         $sql .= "LIMIT 3;\n";
         
         // Executing the query
@@ -127,7 +127,7 @@ class Cupido extends Service
         
         // Building response
         $response = new Response();
-        $response->setResponseSubject('Cupido: Personas de tu interes');
+        $response->setResponseSubject('Personas de tu interes');
         
         if ($random == true) $response->setResponseSubject('No encontramos perfiles para ti, te mostamos algunos aleatorios');
         
@@ -152,7 +152,7 @@ class Cupido extends Service
         
         $response = new Response();
         $response->setResponseSubject('Haz salido de la red de Cupido en Apretaste');
-        $response->createFromText('Haz salido de la red de Cupido en Apretaste. Agradeceremos que nos escr&iacute;bas al soporte para saber tu motivo.');
+        $response->createFromText('Haz salido de la red de Cupido en Apretaste. Agradeceremos que nos escr&iacute;bas al soporte para saber tu motivo. Si deseas volver, simplemente usa el servicio.');
         return $response;
     }
 
@@ -176,7 +176,7 @@ class Cupido extends Service
             return $response;
         }
         
-        // get the person whom you hit like
+        // get current user
         $currentUser = $this->utils->getPerson($request->email);
         
         // get caption depending of the gender
@@ -198,6 +198,7 @@ class Cupido extends Service
         
         if (! $this->isMember($email)) return $this->getNotMemberResponse($email);
         
+        // get the person whom you hit like
         $person = $this->utils->getPerson($email);
         
         if ($this->isLike($request->email, $email)) {
@@ -487,13 +488,6 @@ class Cupido extends Service
         if ($profile->province == "GUANTANAMO") $province = "Guant&aacute;namo";
         if ($profile->province == "ISLA_DA_LA_JUVENTUD") $province = "Isla de la Juventud";
         
-        // get the city
-        $city = empty($profile->city) ? "" : ", {$profile->city}";
-        
-        // full location
-        $location = ". Aunque prefiero no decir de donde soy";
-        if (! empty($province)) $location = ". Vivo en " . $province . $city;
-        
         // get highest educational level
         $education = "";
         if ($profile->highest_school_level == "PRIMARIO") $education = "tengo sexto grado";
@@ -503,12 +497,8 @@ class Cupido extends Service
         if ($profile->highest_school_level == "POSTGRADUADO") $education = "tengo estudios de postgrado";
         if ($profile->highest_school_level == "DOCTORADO") $education = "tengo un doctorado";
         
-        // get marital status
-        $maritalStatus = "";
-        if ($profile->marital_status == "SOLTERO") $maritalStatus = "estoy solter$genderFinalVowel";
-        if ($profile->marital_status == "SALIENDO") $maritalStatus = "estoy saliendo con alguien";
-        if ($profile->marital_status == "COMPROMETIDO") $maritalStatus = "estoy comprometid$genderFinalVowel";
-        if ($profile->marital_status == "CASADO") $maritalStatus = "soy casad$genderFinalVowel";
+        // get occupation
+        $occupation = (empty($profile->occupation) || strlen($profile->occupation) < 5) ? false : strtolower($profile->occupation);
         
         // get religion
         $religions = array(
@@ -533,17 +523,19 @@ class Cupido extends Service
         // create the message
         $message = "Hola y bienvenido a mi perfil. Yo soy $fullName";
         
+        // create the message
+        $message = "";
         if (! empty($religion)) $message .= " y $religion";
-        if (! empty($age)) $message .= ", tengo $age a&ntilde;os";
-        if (! empty($gender)) $message .= ", soy $gender";
-        if (! empty($skin)) $message .= ", soy $skin";
-        if (! empty($eyes)) $message .= ", de ojos $eyesTone (color $eyes)";
-        if (! empty($eyes)) $message .= ", soy de pelo $hair";
-        if (! empty($bodyType)) $message .= " y $bodyType";
-        $message .= $location;
-        if (! empty($education)) $message .= ", $education";
-        if (! empty($profile->occupation)) $message .= ", trabajo como {$profile->occupation}";
-        if (! empty($maritalStatus)) $message .= " y $maritalStatus";
+        if (! empty($profile->first_name)) $message .= "me llamo " . ucfirst(trim($profile->first_name)) . ", ";
+        if (! empty($province)) $message .= "soy de $province, ";
+        if (! empty($age)) $message .= "tengo $age a&ntilde;os, ";
+        if (! empty($skin)) $message .= "soy $skin, ";
+        if (! empty($eyes)) $message .= "de ojos $eyes, ";
+        if (! empty($eyes)) $message .= "soy de pelo $hair, ";
+        if (! empty($bodyType)) $message .= "$bodyType, ";
+        if (! empty($education)) $message .= "$education, ";
+        $message = trim($message, ", ");
+        if ($occupation) $message .= " y trabajo como $occupation";
         $message .= ".";
         
         return ucfirst($message);

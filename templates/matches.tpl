@@ -1,5 +1,5 @@
 {if $random}
-	<h1>Cinco personas que puede te interesen</h1>
+	<h1>Cinco personas que te pueden interesar</h1>
 {else}
 	<h1>Personas afines a usted</h1>
 {/if}
@@ -40,4 +40,5 @@
 	<p><small>Los usuarios que usted oculte nunca se le mostrar&aacute;n nuevamente</small></p>
 	{button href="CUPIDO OCULTAR {foreach name=matchs item=item from=$matchs}{$item->username} {/foreach}" caption="&#10008; Ocultar todos" color="red"}
 	{button href="NOTA" caption="Ver notas" color="grey"}
+	{button href="CUPIDO SALIR" caption="Salir de Cupido" color="red"}
 </center>
