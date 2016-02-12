@@ -9,7 +9,6 @@
  */
 class Cupido extends Service
 {
-
 	private $db = null;
 
 	/**
@@ -44,7 +43,7 @@ class Cupido extends Service
 		$common_filter .= " AND person.marital_status = 'SOLTERO' \n";
 		$common_filter .= " AND person.cupido = 1\n";
 		$common_filter .= " AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20";
-		
+
 		$sql = '';
 		if (is_array($user->interests)) {
 			// Interests
@@ -84,10 +83,10 @@ class Cupido extends Service
 		$sql .= "FROM ($subsql) as subq2\n";
 		$sql .= "ORDER BY percent_match DESC, email ASC\n";
 		$sql .= "LIMIT 3;\n";
-		
+
 		// Executing the query
 		$list = $this->db()->deepQuery(trim($sql));
-		
+
 		$matchs = array();
 		$images = array();
 		$random = false;
@@ -214,30 +213,25 @@ class Cupido extends Service
 					'ya' => false
 			);
 		}
-		
+
 		$user = $this->utils->getPerson($request->email);
-		
+
 		$response2 = new Response();
 		$response2->setResponseEmail($email);
 		$response2->setResponseSubject('Tienes ' . $admirador_caption);
-		$response2->createFromTemplate("like_you.tpl", array(
-				'user' => $user
-		));
-		
+		$response2->createFromTemplate("like_you.tpl", array('user' => $user));
+
 		$response1 = new Response();
 		$response1->setResponseSubject('Haz indicado que te gusta @' . $person->username);
-		
+
 		if (empty($user->full_name)) $user->full_name = $user->username;
-		
+
 		$response1->createFromTemplate('like.tpl', array(
-				'like' => $like,
-				'admirador' => $admirador_caption
+			'like' => $like,
+			'admirador' => $admirador_caption
 		));
-		
-		return array(
-				$response1,
-				$response2
-		);
+
+		return array($response1,$response2);
 	}
 
 	/**
@@ -249,68 +243,70 @@ class Cupido extends Service
 	public function _ocultar (Request $request)
 	{
 		if ( ! $this->isMember($request->email)) return $this->getNotMemberResponse();
-		
+
 		$emails = $this->getEmailsFromRequest($request);
 		$ignores = array();
-		
-		if ( ! isset($emails[0])) {
+
+		if ( ! isset($emails[0]))
+		{
 			$response = new Response();
 			$response->setResponseSubject("Te falta especificar el perfil a ocultar");
 			$response->createFromText("No escribiste en el asunto los nombres de usuarios que deseas ocultar. Por ejemplo: CUPIDO OCULTAR pepe1");
 			return $response;
 		}
-		
-		foreach ($emails as $email) {
-			
+
+		foreach ($emails as $email)
+		{
 			$person = $this->utils->getPerson($email);
 			
-			if ($email == $request->email) {
+			if ($email == $request->email)
+			{
 				$ignores[] = array(
-						'username' => false,
-						'message_before' => 'No puedes ocultarate a ti mismo.',
-						'message_after' => 'Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.'
+					'username' => false,
+					'message_before' => 'No puedes ocultarate a ti mismo.',
+					'message_after' => 'Verifica que la direcci&oacute;n de correo que escribiste sea la correcta.'
 				);
 				continue;
 			}
 			
-			if ( ! $this->isMember($email)) {
+			if ( ! $this->isMember($email))
+			{
 				$un = $email;
-				
+
 				if (is_object($person)) $un = $person->username;
-				
+
 				$ignores[] = array(
-						'username' => $un,
-						'message_before' => '',
-						'message_after' => ' no es miembro de la red de cupido en Apretaste.'
+					'username' => $un,
+					'message_before' => '',
+					'message_after' => ' no es miembro de la red de cupido en Apretaste.'
 				);
 				continue;
 			}
-			
-			if ($this->isIgnore($request->email, $email)) {
+
+			if ($this->isIgnore($request->email, $email))
+			{
 				$ignores[] = array(
-						'username' => $person->username,
-						'message_before' => 'A ',
-						'message_after' => ' ya lo hab&iacute;as ocultado.'
+					'username' => $person->username,
+					'message_before' => 'A ',
+					'message_after' => ' ya lo hab&iacute;as ocultado.'
 				);
 				continue;
 			}
-			
+
 			$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
 			$this->db()->deepQuery($sql);
 			
 			$ignores[] = array(
-					'username' => $person->username,
-					'message_before' => 'Ocultaste satisfactoriamente a ',
-					'message_after' => ''
+				'username' => $person->username,
+				'message_before' => 'Ocultaste satisfactoriamente a ',
+				'message_after' => ''
 			);
 		}
-		
+
 		$response = new Response();
 		$response->setResponseSubject('Haz ocultado los siguientes perfiles');
-		$response->createFromTemplate('ignore.tpl', array(
-				'ignores' => $ignores
-		));
-		
+		$response->createFromTemplate('ignore.tpl', array('ignores' => $ignores));
+
 		return $response;
 	}
 
@@ -340,20 +336,20 @@ class Cupido extends Service
 		$query = explode(" ", $request->query);
 		$parts = array();
 		
-		foreach ($query as $q) {
+		foreach ($query as $q)
+		{
 			$part = trim($q);
 			if ($part !== '') $parts[] = $part;
 		}
 		
 		$emails = array();
-		foreach ($parts as $part) {
+		foreach ($parts as $part)
+		{
 			$find = $this->db()->deepQuery("SELECT email FROM person WHERE username = '{$part}';");
-			if (isset($find[0]))
-				$emails[] = $find[0]->email;
-			else
-				$emails[] = $part;
+			if (isset($find[0])) $emails[] = $find[0]->email;
+			else $emails[] = $part;
 		}
-		
+
 		return $emails;
 	}
 
@@ -364,9 +360,9 @@ class Cupido extends Service
 	{
 		$sql = "SELECT * FROM _cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
 		$find = $this->db()->deepQuery($sql);
-		
+
 		if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
-		
+
 		return false;
 	}
 
@@ -377,9 +373,9 @@ class Cupido extends Service
 	{
 		$sql = "SELECT * FROM _cupido_ignores WHERE email1 = '$email1' AND email2 = '$email2';";
 		$find = $this->db()->deepQuery($sql);
-		
+
 		if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
-		
+
 		return false;
 	}
 
@@ -392,15 +388,18 @@ class Cupido extends Service
 	private function getNotMemberResponse ($email = null)
 	{
 		$response = new Response();
-		
-		if (is_null($email)) {
+
+		if (is_null($email))
+		{
 			$response->setResponseSubject("Usted no forma parte la red Cupido");
 			$response->createFromText("Usted no forma parte la red Cupido");
-		} else {
+		}
+		else
+		{
 			$response->setResponseSubject("$email no forma parte la red Cupido");
 			$response->createFromText("El usuario $email no forma parte la red Cupido");
 		}
-		
+
 		return $response;
 	}
 
@@ -412,7 +411,6 @@ class Cupido extends Service
 	 */
 	private function getProfileDescription ($profile)
 	{
-		
 		// get the full name, or the email
 		$fullName = empty($profile->full_name) ? $profile->username : $profile->full_name;
 		
@@ -490,36 +488,29 @@ class Cupido extends Service
 		if ($profile->highest_school_level == "UNIVERSITARIO") $education = "soy universitari$genderFinalVowel";
 		if ($profile->highest_school_level == "POSTGRADUADO") $education = "tengo estudios de postgrado";
 		if ($profile->highest_school_level == "DOCTORADO") $education = "tengo un doctorado";
-		
+
 		// get occupation
 		$occupation = (empty($profile->occupation) || strlen($profile->occupation) < 5) ? false : strtolower($profile->occupation);
-		
+
 		// get religion
 		$religions = array(
-				'ATEISMO' => 'soy ateo',
-				'SECULARISMO' => 'no tengo creencia religiosa',
-				'AGNOSTICISMO' => 'soy agn&oacute;stico',
-				'ISLAM' => 'soy musulm&aacute;n',
-				'JUDAISTA' => 'soy jud&iacute;o',
-				'ABAKUA' => 'soy abaku&aacute;',
-				'SANTERO' => 'soy santero',
-				'YORUBA' => 'profeso la religi&oacute;n yoruba',
-				'BUDISMO' => 'soy budista',
-				'CATOLICISMO' => 'soy cat&oacute;lico',
-				'OTRA' => 'tengo creencias religiosas',
-				'CRISTIANISMO' => 'soy cristiano'
+			'ATEISMO' => "soy ate$genderFinalVowel",
+			'SECULARISMO' => 'no tengo creencia religiosa',
+			'AGNOSTICISMO' => "soy agn&oacute;stic$genderFinalVowel",
+			'ISLAM' => 'soy musulm&aacute;n',
+			'JUDAISTA' => "soy jud&iacute;o$genderFinalVowel",
+			'ABAKUA' => 'soy abaku&aacute;',
+			'SANTERO' => "soy santer$genderFinalVowel",
+			'YORUBA' => 'profeso la religi&oacute;n yoruba',
+			'BUDISMO' => 'soy budista',
+			'CATOLICISMO' => "soy cat&oacute;lic$genderFinalVowel",
+			'OTRA' => '',
+			'CRISTIANISMO' => "soy cristian$genderFinalVowel"
 		);
-		
-		$religion = '';
-		
-		if ( ! empty($profile->religion)) $religion = $religions[$profile->religion];
-		
-		// create the message
-		$message = "Hola y bienvenido a mi perfil. Yo soy $fullName";
-		
+		$religion = empty($profile->religion) ? "" : $religions[$profile->religion];
+
 		// create the message
 		$message = "";
-		if ( ! empty($religion)) $message .= " y $religion";
 		if ( ! empty($profile->first_name)) $message .= "me llamo " . ucfirst(trim($profile->first_name)) . ", ";
 		if ( ! empty($province)) $message .= "soy de $province, ";
 		if ( ! empty($age)) $message .= "tengo $age a&ntilde;os, ";
@@ -528,10 +519,11 @@ class Cupido extends Service
 		if ( ! empty($eyes)) $message .= "soy de pelo $hair, ";
 		if ( ! empty($bodyType)) $message .= "$bodyType, ";
 		if ( ! empty($education)) $message .= "$education, ";
+		if ( ! empty($religion)) $message .= "$religion,";
 		$message = trim($message, ", ");
 		if ($occupation) $message .= " y trabajo como $occupation";
 		$message .= ".";
-		
+
 		return ucfirst($message);
 	}
 
