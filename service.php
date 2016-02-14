@@ -53,7 +53,7 @@ class Cupido extends Service
 		// create a comma separated list of all people sharing the same interests
 		// if a person shares more than one interest, his/her email will show twice
 		$interests = '';
-		if (is_array($user->interests))
+		if (is_array($user->interests) && ! empty($user->interests))
 		{
 			$sql = "";
 			$last = end($user->interests);
