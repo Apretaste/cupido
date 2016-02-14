@@ -4,5 +4,5 @@
     <li>{$item['message_before']} {link href="PERFIL {$item['username']}" caption ="@{$item['username']}"} {$item['message_after']}</li>
 {/foreach}
 </ul>
-<p>Los perfiles ocultados no se te mostrar&aacute;n m&aacute;s en las b&uacute;squedas de Cupido.</p>
+<p>Los perfiles ocultados no se le mostrar&aacute;n m&aacute;s en las b&uacute;squedas de Cupido.</p>
 <center>{button href="CUPIDO" caption="Cupido"}</center>

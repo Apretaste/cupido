@@ -22,7 +22,10 @@ class Cupido extends Service
 	{
 		$user = $this->utils->getPerson($request->email);
 		$completion = $this->utils->getProfileCompletion($request->email);
-		
+
+		// get my age
+		$age = empty($user->date_of_birth) ? 0 : date_diff(date_create($user->date_of_birth), date_create('today'))->y;
+
 		// Verifying profile completion
 		if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
 		{
@@ -31,58 +34,61 @@ class Cupido extends Service
 			$response->createFromTemplate('not_profile.tpl', array('email' => $request->email));
 			return $response;
 		}
-		
-		// Activating person in cupido
-		$this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
-		
-		// Match algorithm - building sql query
-		$common_filter = " person.email <> '{$request->email}' AND cupido = 1 AND NOT EXISTS (SELECT * FROM _cupido_ignores WHERE _cupido_ignores.email2 = person.email) ";
-		if ($user->sexual_orientation == 'HETERO') $common_filter .= " AND person.gender <> '{$user->gender}' AND person.sexual_orientation <> 'HOMO'";
-		if ($user->sexual_orientation == 'HOMO') $common_filter .= " AND person.gender = '{$user->gender}' AND person.sexual_orientation <> 'HETERO'";
-		if ($user->sexual_orientation == 'BI') $common_filter .= " AND (person.sexual_orientation = 'BI' OR (person.sexual_orientation = 'HOMO' AND person.gender = '{$user->gender}') OR (person.sexual_orientation = 'HETERO' AND person.gender <> '{$user->gender}'))";
-		$common_filter .= " AND person.marital_status = 'SOLTERO' \n";
-		$common_filter .= " AND person.cupido = 1\n";
-		$common_filter .= " AND abs(datediff(person.date_of_birth, '{$user->date_of_birth}')) / 365 <= 20";
 
-		$sql = '';
-		if (is_array($user->interests)) {
-			// Interests
-			$sql = "SELECT email, sum(v) as vv FROM(\n";
-			$j = 0;
-			$ints = strtolower(implode(",", $user->interests));
-			for ($i = 1; $i <= 10; $i ++) {
-				$j ++;
-				if ($j > 1) $sql .= ' UNION ALL ';
-				$sql .= " select email, IF('{$ints}' LIKE CONCAT('%',lower(split_str(interests,',',{$i})),'%'),1,0) as v from person WHERE CONCAT('%',lower(split_str(interests,',',{$i})),'%') <> '%%' \n";
-			}
-			$sql .= ") as subq GROUP BY email\n";
+		// re-activate person in cupido
+		if( ! $user->cupido)
+		{
+			$this->db()->deepQuery("UPDATE person SET cupido = 1 WHERE email = '{$request->email}';");
 		}
 
-		$subsql = $sql;
-		$total_interests = count($user->interests);
-		
-		$sql = "SELECT email,\n";
-		$sql .= "(select proximity FROM ( SELECT  `_province_distance`.`province1` AS `province1`,
-			`_province_distance`.`province2` AS `province2`,
-			`_province_distance`.`distance` AS `distance`,
-			(select (100 - ((`_province_distance`.`distance` / (select max(`dist2`.`distance`) FROM `_province_distance` `dist2`)) * 100))) AS `proximity` 
-			FROM `_province_distance`) as _province_proximity WHERE (province1 = person.province AND province2 = '{$user->province}') OR (province2 = person.province AND province1 = '{$user->province}')) / 100 * 15 as percent_proximity,\n";
-		$sql .= "(select count(*) FROM _cupido_likes WHERE _cupido_likes.email2 = person.email) / (select count(*) FROM person as __cupido_members WHERE __cupido_members.cupido = 1)  * 15 as percent_likes,\n";
-		$sql .= "(select person.skin = '{$user->skin}') * 5 as same_skin,\n" . "(select person.picture is not null) * 20 as having_picture,\n";
-		$sql .= "(1 - (abs(datediff(person.date_of_birth, '{$user->date_of_birth}'))/365 / 20)) * 15 as age_proximity,\n";
-		$sql .= "(select person.body_type = '{$user->body_type}')* 5 as same_body_type,\n";
-		$sql .= "(select person.religion = '{$user->religion}')* 20 as same_religion,\n";
-		
-		if ($total_interests > 0)
-			$sql .= "(select vv FROM ($subsql) as subq1 WHERE email = person.email) / $total_interests * 25 as percent_preferences\n";
-		else
-			$sql .= "0 as percent_preferences\n";
-		$sql .= " FROM person\n WHERE $common_filter \n";
-		$subsql = $sql;
-		$sql = " SELECT email, percent_proximity + percent_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match\n";
-		$sql .= "FROM ($subsql) as subq2\n";
-		$sql .= "ORDER BY percent_match DESC, email ASC\n";
-		$sql .= "LIMIT 3;\n";
+		// create the where clause for the query
+		$where  = " email <> '{$request->email}'";
+		$where .= " AND NOT EXISTS (SELECT email2 FROM _cupido_ignores WHERE email2 = email)";
+		if ($user->sexual_orientation == 'HETERO') $where .= " AND gender <> '{$user->gender}' AND sexual_orientation <> 'HOMO'";
+		if ($user->sexual_orientation == 'HOMO') $where .= " AND gender = '{$user->gender}' AND sexual_orientation <> 'HETERO'";
+		if ($user->sexual_orientation == 'BI') $where .= " AND (sexual_orientation = 'BI' OR (sexual_orientation = 'HOMO' AND gender = '{$user->gender}') OR (sexual_orientation = 'HETERO' AND gender <> '{$user->gender}'))";
+		$where .= " AND (marital_status <> 'CASADO' OR marital_status IS NULL) ";
+		$where .= " AND cupido = '1'";
+
+		// create a comma separated list of all people sharing the same interests
+		// if a person shares more than one interest, his/her email will show twice
+		$interests = '';
+		if (is_array($user->interests))
+		{
+			$sql = "";
+			$last = end($user->interests);
+			foreach($user->interests as $interest)
+			{
+				$sql .= "SELECT email, LOWER('$interest') as interest FROM person WHERE LOWER(interests) LIKE LOWER('%$interest%') && email <> '{$request->email}'";
+				if($interest != $last) $sql .= " UNION "; 
+			}
+
+			$res = $this->db()->deepQuery(trim($sql));
+			foreach ($res as $r)
+			{
+				$interests .= $r->email.",";
+			}
+		}
+
+		// create subquery to calculate the percentages
+		$subsql  = "SELECT email, ";
+		$subsql .= "(select IFNULL(province, '') = '{$user->province}') * 50 as location_proximity, ";
+		$subsql .= "(select IFNULL(marital_status, '') = 'SOLTERO') * 20 as percent_single, ";
+		$subsql .= "(select count(*) FROM _cupido_likes WHERE email2 = email) * 5 as number_likes, ";
+		$subsql .= "(select IFNULL(skin, '') = '{$user->skin}') * 5 as same_skin, "; 
+		$subsql .= "(select picture = 1) * 30 as having_picture, ";
+		$subsql .= "(ABS(IFNULL(YEAR(CURDATE()) - YEAR(date_of_birth), 0) - $age) < 20) * 15 as age_proximity,  ";
+		$subsql .= "(select IFNULL(body_type, '') = '{$user->body_type}') * 5 as same_body_type, ";
+		$subsql .= "(select IFNULL(religion, '') = '{$user->religion}') * 20 as same_religion, ";
+		if ($interests != '') $subsql .= "(select (LENGTH('$interests')-LENGTH(REPLACE('$interests', email, '')))/LENGTH(email)) * 10  as percent_preferences ";
+		else $subsql .= "0 as percent_preferences ";
+		$subsql .= " FROM person WHERE $where  ";
+
+		// create final query
+		$sql  = "SELECT email, percent_preferences, number_likes, percent_single + location_proximity + number_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match ";
+		$sql .= "FROM ($subsql) as subq2 ";
+		$sql .= "ORDER BY percent_match DESC, email ASC ";
+		$sql .= "LIMIT 3; ";
 
 		// Executing the query
 		$list = $this->db()->deepQuery(trim($sql));
@@ -92,8 +98,9 @@ class Cupido extends Service
 		$random = false;
 		
 		// If not matchs, return random profiles
-		if (empty($list) || is_null($list)) {
-			$sql = "SELECT email FROM person WHERE $common_filter ORDER BY rand() LIMIT 3";
+		if (empty($list) || is_null($list))
+		{
+			$sql = "SELECT email FROM person WHERE $where ORDER BY rand() LIMIT 3";
 			$list = $this->db()->deepQuery($sql);
 			$random = true;
 		}
@@ -104,12 +111,14 @@ class Cupido extends Service
 			foreach ($list as $item)
 			{
 				$profile = $this->utils->getPerson($item->email);
-				if ($profile === false) continue;
+				if($profile === false) continue;
 				if( ! empty($profile->thumbnail)) $images[] = $profile->thumbnail;
-				if ($profile->full_name == '') $profile->full_name = $profile->email;
-				$profile->button_like = true;
-				if ($this->isLike($request->email, $profile->email)) $profile->button_like = false;
+				if(empty($profile->full_name)) $profile->full_name = "@".$profile->username;
+
+				$profile->button_like = ! $this->isLike($request->email, $profile->email);
 				$profile->description = $this->getProfileDescription($profile);
+				$profile->popular = $item->number_likes > 5;
+				$profile->commonInterests = $item->percent_preferences > 10;
 
 				$matchs[] = $profile;
 			}
@@ -124,11 +133,21 @@ class Cupido extends Service
 			return $response;
 		}
 
+		$responseContent = array(
+			"matchs" => $matchs, 
+			"profile" => $user,
+			"noProfilePic" => empty($user->thumbnail),
+			"noProvince" => empty($user->province),
+			"fewInterests" => count($user->interests) <= 10,
+			"completion" => $completion,
+			"random" => $random
+		);
+
 		// Building response
 		$response = new Response();
 		if ($random) $response->setResponseSubject('No encontramos perfiles para ti, te mostramos algunos aleatorios');
 		else $response->setResponseSubject('Personas de tu interes');
-		$response->createFromTemplate('matches.tpl', array('matchs'=>$matchs, 'random'=>$random), $images);
+		$response->createFromTemplate('matches.tpl', $responseContent, $images);
 		return $response;
 	}
 
@@ -145,7 +164,7 @@ class Cupido extends Service
 		
 		$response = new Response();
 		$response->setResponseSubject('Haz salido de la red de Cupido en Apretaste');
-		$response->createFromText('Haz salido de la red de Cupido en Apretaste. Si deseas volver, simplemente usa el servicio.');
+		$response->createFromText('Haz salido de la red de Cupido. No recibir&aacute;s m&aacute;s emails de otros usuarios diciendo que le gustas ni aparecer&aacute;s en la lista de Cupido. Si deseas volver, simplemente usa el servicio nuevamente. &iexcl;Gracias por usar Apretaste!');
 		return $response;
 	}
 
@@ -158,20 +177,22 @@ class Cupido extends Service
 	public function _like (Request $request)
 	{
 		// check if you are a member
-		if ( ! $this->isMember($request->email)) {
+		if ( ! $this->isMember($request->email))
+		{
 			return $this->getNotMemberResponse();
 		}
-		
-		if (empty(trim($request->query))) {
+
+		if (empty(trim($request->query)))
+		{
 			$response = new Response();
 			$response->setResponseSubject('No indicaste el nombre de usuario que te gusta');
 			$response->createFromText('No indicaste el nombre de usuario que te gusta. Para hacerlo debes escribir el nombre de usuario en el asunto seguido del texto CUIPIDO LIKE.');
 			return $response;
 		}
-		
+
 		// get current user
 		$currentUser = $this->utils->getPerson($request->email);
-		
+
 		// get caption depending of the gender
 		$admirador_caption = 'un(a) admirador(a)';
 		if ($currentUser->gender = 'F') $admirador_caption = 'una admiradora';
@@ -179,39 +200,32 @@ class Cupido extends Service
 		
 		$emails = $this->getEmailsFromRequest($request);
 		
-		if ( ! isset($emails[0])) {
+		if ( ! isset($emails[0]))
+		{
 			$response = new Response();
 			$response->setResponseSubject('El nombre de usuario que te gusta no existe en Apretaste.');
 			$response->createFromText('Indicaste un nombre de usuario que no existe en Apretaste. Para hacerlo debes escribir el nombre de usuario en el asunto seguido del texto CUIPIDO LIKE.');
 			return $response;
 		}
-		
+
 		$likes = array();
 		$email = $emails[0];
-		
+
 		if ( ! $this->isMember($email)) return $this->getNotMemberResponse($email);
-		
+
 		// get the person whom you hit like
 		$person = $this->utils->getPerson($email);
-		
-		if ($this->isLike($request->email, $email)) {
-			$like = array(
-					'full_name' => $person->full_name,
-					'username' => $person->username,
-					'ya' => true
-			);
-		} else {
-			
+
+		if ($this->isLike($request->email, $email))
+		{
+			$like = array('full_name' => $person->full_name,'username' => $person->username,'ya' => true);
+		}
+		else
+		{
 			$sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
 			$this->db()->deepQuery($sql);
-			
-			if (empty($person->full_name)) $person->full_name = $person->username;
-			
-			$like = array(
-					'full_name' => $person->full_name,
-					'username' => $person->username,
-					'ya' => false
-			);
+			if (empty($person->full_name)) $person->full_name = "@".$person->username;
+			$like = array('full_name' => $person->full_name,'username' => $person->username,'ya' => false);
 		}
 
 		$user = $this->utils->getPerson($request->email);
@@ -222,14 +236,9 @@ class Cupido extends Service
 		$response2->createFromTemplate("like_you.tpl", array('user' => $user));
 
 		$response1 = new Response();
-		$response1->setResponseSubject('Haz indicado que te gusta @' . $person->username);
-
-		if (empty($user->full_name)) $user->full_name = $user->username;
-
-		$response1->createFromTemplate('like.tpl', array(
-			'like' => $like,
-			'admirador' => $admirador_caption
-		));
+		$response1->setResponseSubject('Te gusta @' . $person->username);
+		if (empty($user->full_name)) $user->full_name = "@".$user->username;
+		$response1->createFromTemplate('like.tpl', array('like' => $like, 'admirador' => $admirador_caption));
 
 		return array($response1,$response2);
 	}
@@ -339,7 +348,7 @@ class Cupido extends Service
 		foreach ($query as $q)
 		{
 			$part = trim($q);
-			if ($part !== '') $parts[] = $part;
+			if ($part !== '') $parts[] = trim($part, " @,;");
 		}
 		
 		$emails = array();
@@ -360,10 +369,7 @@ class Cupido extends Service
 	{
 		$sql = "SELECT * FROM _cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
 		$find = $this->db()->deepQuery($sql);
-
-		if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
-
-		return false;
+		return count($find) > 0;
 	}
 
 	/**
@@ -412,7 +418,7 @@ class Cupido extends Service
 	private function getProfileDescription ($profile)
 	{
 		// get the full name, or the email
-		$fullName = empty($profile->full_name) ? $profile->username : $profile->full_name;
+		$fullName = empty($profile->full_name) ? $profile->username : trim($profile->full_name, " .,;");
 		
 		// get the age
 		$age = empty($profile->date_of_birth) ? "" : date_diff(date_create($profile->date_of_birth), date_create('today'))->y;
@@ -428,17 +434,12 @@ class Cupido extends Service
 		
 		// get the eye color
 		$eyes = "";
-		if ($profile->eyes == "NEGRO") $eyes = "negro";
+		if ($profile->eyes == "NEGRO") $eyes = "negros";
 		if ($profile->eyes == "CARMELITA") $eyes = "carmelita";
-		if ($profile->eyes == "AZUL") $eyes = "azul";
-		if ($profile->eyes == "VERDE") $eyes = "verde";
+		if ($profile->eyes == "AZUL") $eyes = "azules";
+		if ($profile->eyes == "VERDE") $eyes = "verdes";
 		if ($profile->eyes == "AVELLANA") $eyes = "avellana";
-		
-		// get the eye tone
-		$eyesTone = "";
-		if ($profile->eyes == "NEGRO" || $profile->eyes == "CARMELITA" || $profile->eyes == "AVELLANA") $eyesTone = "oscuros";
-		if ($profile->eyes == "AZUL" || $profile->eyes == "VERDE") $eyesTone = "claros";
-		
+
 		// get the skin color
 		$skin = "";
 		if ($profile->skin == "NEGRO") $skin = "negr$genderFinalVowel";
@@ -478,7 +479,7 @@ class Cupido extends Service
 		if ($profile->province == "GRANMA") $province = "Granma";
 		if ($profile->province == "SANTIAGO_DE_CUBA") $province = "Santiago de Cuba";
 		if ($profile->province == "GUANTANAMO") $province = "Guant&aacute;namo";
-		if ($profile->province == "ISLA_DA_LA_JUVENTUD") $province = "Isla de la Juventud";
+		if ($profile->province == "ISLA_DE_LA_JUVENTUD") $province = "Isla de la Juventud";
 		
 		// get highest educational level
 		$education = "";
@@ -491,6 +492,7 @@ class Cupido extends Service
 
 		// get occupation
 		$occupation = (empty($profile->occupation) || strlen($profile->occupation) < 5) ? false : strtolower($profile->occupation);
+		if(stripos($occupation, "studiant") !== false) $occupation = "";
 
 		// get religion
 		$religions = array(
@@ -516,7 +518,7 @@ class Cupido extends Service
 		if ( ! empty($age)) $message .= "tengo $age a&ntilde;os, ";
 		if ( ! empty($skin)) $message .= "soy $skin, ";
 		if ( ! empty($eyes)) $message .= "de ojos $eyes, ";
-		if ( ! empty($eyes)) $message .= "soy de pelo $hair, ";
+		if ( ! empty($hair)) $message .= "soy de pelo $hair, ";
 		if ( ! empty($bodyType)) $message .= "$bodyType, ";
 		if ( ! empty($education)) $message .= "$education, ";
 		if ( ! empty($religion)) $message .= "$religion,";
