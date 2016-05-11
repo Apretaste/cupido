@@ -43,7 +43,7 @@ class Cupido extends Service
 
 		// create the where clause for the query
 		$where  = " email <> '{$request->email}'";
-		$where .= " AND NOT EXISTS (SELECT email2 FROM _cupido_ignores WHERE email2 = email)";
+		$where .= " AND email NOT IN (SELECT email2 FROM _cupido_ignores WHERE email1 = '{$request->email}')";
 		if ($user->sexual_orientation == 'HETERO') $where .= " AND gender <> '{$user->gender}' AND sexual_orientation <> 'HOMO'";
 		if ($user->sexual_orientation == 'HOMO') $where .= " AND gender = '{$user->gender}' AND sexual_orientation <> 'HETERO'";
 		if ($user->sexual_orientation == 'BI') $where .= " AND (sexual_orientation = 'BI' OR (sexual_orientation = 'HOMO' AND gender = '{$user->gender}') OR (sexual_orientation = 'HETERO' AND gender <> '{$user->gender}'))";
@@ -96,7 +96,7 @@ class Cupido extends Service
 		$matchs = array();
 		$images = array();
 		$random = false;
-		
+
 		// If not matchs, return random profiles
 		if (empty($list) || is_null($list))
 		{
