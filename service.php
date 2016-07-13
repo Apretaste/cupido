@@ -43,7 +43,8 @@ class Cupido extends Service
 
 		// create the where clause for the query
 		$where  = " email <> '{$request->email}'";
-		$where .= " AND email NOT IN (SELECT email2 FROM _cupido_ignores WHERE email1 = '{$request->email}')";
+		//$where .= " AND email NOT IN (SELECT email2 FROM _cupido_ignores WHERE email1 = '{$request->email}')";
+		$where .= " AND email NOT IN (SELECT email2 FROM relations WHERE email1 = '{$request->email}' and relations.type = 'ignore')";
 		if ($user->sexual_orientation == 'HETERO') $where .= " AND gender <> '{$user->gender}' AND sexual_orientation <> 'HOMO'";
 		if ($user->sexual_orientation == 'HOMO') $where .= " AND gender = '{$user->gender}' AND sexual_orientation <> 'HETERO'";
 		if ($user->sexual_orientation == 'BI') $where .= " AND (sexual_orientation = 'BI' OR (sexual_orientation = 'HOMO' AND gender = '{$user->gender}') OR (sexual_orientation = 'HETERO' AND gender <> '{$user->gender}'))";
@@ -303,7 +304,8 @@ class Cupido extends Service
 				continue;
 			}
 
-			$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+			//$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+			$sql = "INSERT INTO relations (user1, user2, type, confirmed) VALUES ('{$request->email}','$email','ignore', 1);";
 			$this->db()->deepQuery($sql);
 			
 			$ignores[] = array(
@@ -378,7 +380,8 @@ class Cupido extends Service
 	 */
 	private function isIgnore ($email1, $email2)
 	{
-		$sql = "SELECT * FROM _cupido_ignores WHERE email1 = '$email1' AND email2 = '$email2';";
+		//$sql = "SELECT * FROM _cupido_ignores WHERE email1 = '$email1' AND email2 = '$email2';";
+		$sql = "SELECT * FROM relations WHERE email1 = '$email1' AND email2 = '$email2' AND type = 'ignore';";
 		$find = $this->db()->deepQuery($sql);
 
 		if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
