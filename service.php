@@ -43,8 +43,8 @@ class Cupido extends Service
 
 		// create the where clause for the query
 		$where  = " email <> '{$request->email}'";
-		$where .= " AND email NOT IN (SELECT email2 FROM _cupido_ignores WHERE email1 = '{$request->email}')";
-		//$where .= " AND email NOT IN (SELECT user2 FROM relations WHERE user1 = '{$request->email}' and relations.type = 'ignore')";
+		//$where .= " AND email NOT IN (SELECT email2 FROM _cupido_ignores WHERE email1 = '{$request->email}')";
+		$where .= " AND email NOT IN (SELECT user2 FROM relations WHERE user1 = '{$request->email}' and relations.type = 'ignore')";
 		if ($user->sexual_orientation == 'HETERO') $where .= " AND gender <> '{$user->gender}' AND sexual_orientation <> 'HOMO'";
 		if ($user->sexual_orientation == 'HOMO') $where .= " AND gender = '{$user->gender}' AND sexual_orientation <> 'HETERO'";
 		if ($user->sexual_orientation == 'BI') $where .= " AND (sexual_orientation = 'BI' OR (sexual_orientation = 'HOMO' AND gender = '{$user->gender}') OR (sexual_orientation = 'HETERO' AND gender <> '{$user->gender}'))";
@@ -75,7 +75,8 @@ class Cupido extends Service
 		$subsql  = "SELECT email, ";
 		$subsql .= "(select IFNULL(province, '') = '{$user->province}') * 50 as location_proximity, ";
 		$subsql .= "(select IFNULL(marital_status, '') = 'SOLTERO') * 20 as percent_single, ";
-		$subsql .= "(select count(*) FROM _cupido_likes WHERE email2 = email) * 5 as number_likes, ";
+		//$subsql .= "(select count(*) FROM _cupido_likes WHERE email2 = email) * 5 as number_likes, ";
+		$subsql .= "(select count(*) FROM relations WHERE relations.user2 = email) * 5 as number_likes, ";
 		$subsql .= "(select IFNULL(skin, '') = '{$user->skin}') * 5 as same_skin, "; 
 		$subsql .= "(select picture = 1) * 30 as having_picture, ";
 		$subsql .= "(ABS(IFNULL(YEAR(CURDATE()) - YEAR(date_of_birth), 0) - $age) < 20) * 15 as age_proximity,  ";
@@ -223,8 +224,8 @@ class Cupido extends Service
 		}
 		else
 		{
-			$sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
-			//$sql = "INSERT INTO relations (user1,user2,type,confirmed) VALUES ('{$request->email}','{$email}','like',1);";
+			//$sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
+			$sql = "INSERT INTO relations (user1,user2,type,confirmed) VALUES ('{$request->email}','{$email}','like',1);";
 			$this->db()->deepQuery($sql);
 			if (empty($person->full_name)) $person->full_name = "@".$person->username;
 			$like = array('full_name' => $person->full_name,'username' => $person->username,'ya' => false);
@@ -304,8 +305,8 @@ class Cupido extends Service
 				continue;
 			}
 
-			$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
-			//$sql = "INSERT INTO relations (user1, user2, type, confirmed) VALUES ('{$request->email}','$email','ignore', 1);";
+			//$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
+			$sql = "INSERT INTO relations (user1, user2, type, confirmed) VALUES ('{$request->email}','$email','ignore', 1);";
 			$this->db()->deepQuery($sql);
 			
 			$ignores[] = array(
@@ -370,7 +371,8 @@ class Cupido extends Service
 	 */
 	private function isLike ($email1, $email2)
 	{
-		$sql = "SELECT * FROM _cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
+		//$sql = "SELECT * FROM _cupido_likes WHERE email1 = '$email1' AND email2 = '$email2';";
+		$sql = "SELECT * FROM relations WHERE user1 = '$email1' AND user2 = '$email2';";
 		$find = $this->db()->deepQuery($sql);
 		return count($find) > 0;
 	}
@@ -384,8 +386,8 @@ class Cupido extends Service
 		//$sql = "SELECT * FROM relations WHERE email1 = '$email1' AND email2 = '$email2' AND type = 'ignore';";
 		$find = $this->db()->deepQuery($sql);
 
-		if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
-
+		//if (isset($find[0])) if ($find[0]->email1 == $email1 && $find[0]->email2 == $email2) return true;
+		if (isset($find[0])) if ($find[0]->user1 == $email1 && $find[0]->user2 == $email2) return true;
 		return false;
 	}
 
