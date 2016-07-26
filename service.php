@@ -306,7 +306,7 @@ class Cupido extends Service
 			}
 
 			//$sql = "INSERT INTO _cupido_ignores (email1, email2) VALUES ('{$request->email}','$email');";
-			$sql = "INSERT INTO relations (user1, user2, type, confirmed) VALUES ('{$request->email}','$email','ignore', 1);";
+			$sql = "INSERT IGNORE INTO relations (user1, user2, type, confirmed) VALUES ('{$request->email}','$email','ignore', 1);";
 			$this->db()->deepQuery($sql);
 			
 			$ignores[] = array(
