@@ -227,6 +227,10 @@ class Cupido extends Service
 			//$sql = "INSERT INTO _cupido_likes (email1, email2) VALUES ('{$request->email}','$email');";
 			$sql = "INSERT INTO relations (user1,user2,type,confirmed) VALUES ('{$request->email}','{$email}','like',1);";
 			$this->db()->deepQuery($sql);
+			
+			// Generate a notification
+			$this->utils->addNotification($email, 'cupido like', 'Tienes ' . $admirador_caption. '. Nuestro usuario @' . $currentUser->username. ' ha dicho que le gustas.', 'PERFIL @'.$currentUser->username);
+			
 			if (empty($person->full_name)) $person->full_name = "@".$person->username;
 			$like = array('full_name' => $person->full_name,'username' => $person->username,'ya' => false);
 		}
