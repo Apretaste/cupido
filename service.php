@@ -27,12 +27,14 @@ class Cupido extends Service
 		$age = empty($user->date_of_birth) ? 0 : date_diff(date_create($user->date_of_birth), date_create('today'))->y;
 
 		// Verifying profile completion
+		$low_profile = false;
 		if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
 		{
-			$response = new Response();
+			$low_profile = true;
+			/*$response = new Response();
 			$response->setResponseSubject("Cree su perfil en Apretaste!");
 			$response->createFromTemplate('not_profile.tpl', array('email' => $request->email));
-			return $response;
+			return $response;*/
 		}
 
 		// re-activate person in cupido
@@ -70,29 +72,42 @@ class Cupido extends Service
 			}
 		}
 
-		// create subquery to calculate the percentages
-		$subsql  = "SELECT email, ";
-		$subsql .= "(select IFNULL(province, '') = '{$user->province}') * 50 as location_proximity, ";
-		$subsql .= "(select IFNULL(marital_status, '') = 'SOLTERO') * 20 as percent_single, ";
-		$subsql .= "(select count(*) FROM relations WHERE relations.user2 = email) * 5 as number_likes, ";
-		$subsql .= "(select IFNULL(skin, '') = '{$user->skin}') * 5 as same_skin, "; 
-		$subsql .= "(select picture = 1) * 30 as having_picture, ";
-		$subsql .= "(ABS(IFNULL(YEAR(CURDATE()) - YEAR(date_of_birth), 0) - $age) < 20) * 15 as age_proximity,  ";
-		$subsql .= "(select IFNULL(body_type, '') = '{$user->body_type}') * 5 as same_body_type, ";
-		$subsql .= "(select IFNULL(religion, '') = '{$user->religion}') * 20 as same_religion, ";
-		if ($interests != '') $subsql .= "(select (LENGTH('$interests')-LENGTH(REPLACE('$interests', email, '')))/LENGTH(email)) * 10  as percent_preferences ";
-		else $subsql .= "0 as percent_preferences ";
-		$subsql .= " FROM person WHERE $where  ";
-
-		// create final query
-		$sql  = "SELECT email, percent_preferences, number_likes, percent_single + location_proximity + number_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match ";
-		$sql .= "FROM ($subsql) as subq2 ";
-		$sql .= "ORDER BY percent_match DESC, email ASC ";
-		$sql .= "LIMIT 3; ";
-
-		// Executing the query
-		$list = $this->db()->deepQuery(trim($sql));
-
+		$list = null;
+		
+		// if profile is incomplete, then return the top ten profiles ...
+		if ($low_profile)
+		{
+			// hot people === more likes
+			$sql = "SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes FROM person WHERE $where ORDER BY number_likes desc LIMIT 10";
+			$list = $this->db()->deepQuery($sql);
+		}
+		else
+		{
+			// ... else return the best match
+			// create subquery to calculate the percentages
+			$subsql  = "SELECT email, ";
+			$subsql .= "(select IFNULL(province, '') = '{$user->province}') * 50 as location_proximity, ";
+			$subsql .= "(select IFNULL(marital_status, '') = 'SOLTERO') * 20 as percent_single, ";
+			$subsql .= "(select count(*) FROM relations WHERE relations.user2 = email) * 5 as number_likes, ";
+			$subsql .= "(select IFNULL(skin, '') = '{$user->skin}') * 5 as same_skin, "; 
+			$subsql .= "(select picture = 1) * 30 as having_picture, ";
+			$subsql .= "(ABS(IFNULL(YEAR(CURDATE()) - YEAR(date_of_birth), 0) - $age) < 20) * 15 as age_proximity,  ";
+			$subsql .= "(select IFNULL(body_type, '') = '{$user->body_type}') * 5 as same_body_type, ";
+			$subsql .= "(select IFNULL(religion, '') = '{$user->religion}') * 20 as same_religion, ";
+			if ($interests != '') $subsql .= "(select (LENGTH('$interests')-LENGTH(REPLACE('$interests', email, '')))/LENGTH(email)) * 10  as percent_preferences ";
+			else $subsql .= "0 as percent_preferences ";
+			$subsql .= " FROM person WHERE $where  ";
+	
+			// create final query
+			$sql  = "SELECT email, percent_preferences, number_likes, percent_single + location_proximity + number_likes + same_skin + having_picture + age_proximity + same_body_type + same_religion + percent_preferences as percent_match ";
+			$sql .= "FROM ($subsql) as subq2 ";
+			$sql .= "ORDER BY percent_match DESC, email ASC ";
+			$sql .= "LIMIT 3; ";
+	
+			// Executing the query
+			$list = $this->db()->deepQuery(trim($sql));
+		} 
+		
 		$matchs = array();
 		$images = array();
 		$random = false;
@@ -176,6 +191,18 @@ class Cupido extends Service
 	 */
 	public function _like (Request $request)
 	{
+		$user = $this->utils->getPerson($request->email);
+		$completion = $this->utils->getProfileCompletion($request->email);
+			
+		// Verifying profile completion
+		if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
+		{
+			 $response = new Response();
+			 $response->setResponseSubject("Cree su perfil en Apretaste!");
+			 $response->createFromTemplate('not_profile.tpl', array('email' => $request->email));
+			 return $response;
+		}
+		
 		// check if you are a member
 		if ( ! $this->isMember($request->email))
 		{
