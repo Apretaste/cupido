@@ -31,10 +31,6 @@ class Cupido extends Service
 		if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
 		{
 			$low_profile = true;
-			/*$response = new Response();
-			$response->setResponseSubject("Cree su perfil en Apretaste!");
-			$response->createFromTemplate('not_profile.tpl', array('email' => $request->email));
-			return $response;*/
 		}
 
 		// re-activate person in cupido
