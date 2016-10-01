@@ -75,7 +75,8 @@ class Cupido extends Service
 		{
 			// hot people === more likes
 			$sql = "
-			SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes 
+			SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes,
+			0 as percent_preferences
 			FROM person 
 			WHERE  email <> '{$request->email}'
 				AND email NOT IN (SELECT user2 FROM relations WHERE user1 = '{$request->email}' and relations.type = 'ignore')
