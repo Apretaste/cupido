@@ -74,8 +74,21 @@ class Cupido extends Service
 		if ($low_profile)
 		{
 			// hot people === more likes
-			$sql = "SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes FROM person WHERE $where ORDER BY number_likes desc LIMIT 10";
-			$list = $this->db()->deepQuery($sql);
+			$sql = "
+			SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes 
+			FROM person 
+			WHERE  email <> '{$request->email}'
+				AND email NOT IN (SELECT user2 FROM relations WHERE user1 = '{$request->email}' and relations.type = 'ignore')
+				AND gender = '{sex}'
+				AND (marital_status <> 'CASADO' OR marital_status IS NULL)
+				AND cupido = '1'
+			ORDER BY number_likes desc 
+			UNION
+			LIMIT {limit};";
+			
+			$list1 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('F', 2), $sql));
+			$list1 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('M', 1), $sql));
+			$list  = array_merge($list1, $list2);
 		}
 		else
 		{
