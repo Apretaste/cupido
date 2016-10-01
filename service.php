@@ -82,12 +82,13 @@ class Cupido extends Service
 				AND gender = '{sex}'
 				AND (marital_status <> 'CASADO' OR marital_status IS NULL)
 				AND cupido = '1'
+				AND picture = '1'
 			ORDER BY number_likes desc 
 			UNION
 			LIMIT {limit};";
 			
 			$list1 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('F', 2), $sql));
-			$list1 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('M', 1), $sql));
+			$list2 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('M', 1), $sql));
 			$list  = array_merge($list1, $list2);
 		}
 		else
