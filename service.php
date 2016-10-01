@@ -84,7 +84,6 @@ class Cupido extends Service
 				AND cupido = '1'
 				AND picture = '1'
 			ORDER BY number_likes desc 
-			UNION
 			LIMIT {limit};";
 			
 			$list1 = $this->db()->deepQuery(str_replace(array('{sex}','{limit}'),array('F', 2), $sql));
