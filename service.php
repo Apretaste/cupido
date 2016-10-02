@@ -205,13 +205,13 @@ class Cupido extends Service
 		$completion = $this->utils->getProfileCompletion($request->email);
 			
 		// Verifying profile completion
-		if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
+		/*if ($completion * 1 < 70 || empty($user->gender) || empty($user->full_name))
 		{
 			 $response = new Response();
 			 $response->setResponseSubject("Cree su perfil en Apretaste!");
 			 $response->createFromTemplate('not_profile.tpl', array('email' => $request->email));
 			 return $response;
-		}
+		}*/
 		
 		// check if you are a member
 		if ( ! $this->isMember($request->email))
