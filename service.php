@@ -305,6 +305,7 @@ class Cupido extends Service
 			return $response;
 		}
 
+		$ignores_str = '';
 		foreach ($emails as $email)
 		{
 			$person = $this->utils->getPerson($email);
@@ -351,13 +352,13 @@ class Cupido extends Service
 				'message_before' => 'Ocultaste satisfactoriamente a ',
 				'message_after' => ''
 			);
+			
+			$ignores_str .= '@'.$person->username;
 		}
 
-		$response = new Response();
-		$response->setResponseSubject('Haz ocultado los siguientes perfiles');
-		$response->createFromTemplate('ignore.tpl', array('ignores' => $ignores));
-
-		return $response;
+		$this->utils->addNotification($request->email, 'cupido', "Haz ocultado varios perfiles: {$ignores_str}. Los perfiles ocultados no se le mostrar&aacute;n m&aacute;s en las b&uacute;squedas de Cupido.");
+		
+		return new Response();
 	}
 
 	/**
