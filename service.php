@@ -75,7 +75,7 @@ class Cupido extends Service
 		{
 			// hot people === more likes
 			$sql = "
-			SELECT email, (select count(*) FROM relations WHERE relations.user2 = email) as number_likes,
+			SELECT email, (select count(id) FROM relations WHERE relations.user2 = email) as number_likes,
 			0 as percent_preferences
 			FROM person 
 			WHERE  email <> '{$request->email}'
@@ -98,7 +98,7 @@ class Cupido extends Service
 			$subsql  = "SELECT email, ";
 			$subsql .= "(select IFNULL(province, '') = '{$user->province}') * 50 as location_proximity, ";
 			$subsql .= "(select IFNULL(marital_status, '') = 'SOLTERO') * 20 as percent_single, ";
-			$subsql .= "(select count(*) FROM relations WHERE relations.user2 = email) * 5 as number_likes, ";
+			$subsql .= "(select count(id) FROM relations WHERE relations.user2 = email) * 5 as number_likes, ";
 			$subsql .= "(select IFNULL(skin, '') = '{$user->skin}') * 5 as same_skin, "; 
 			$subsql .= "(select picture = 1) * 30 as having_picture, ";
 			$subsql .= "(ABS(IFNULL(YEAR(CURDATE()) - YEAR(date_of_birth), 0) - $age) < 20) * 15 as age_proximity,  ";
